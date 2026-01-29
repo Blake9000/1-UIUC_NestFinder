@@ -16,3 +16,4 @@ class Apartment(models.Model):
     housing_type = models.TextField(null=True, blank=True)
     date_posted = models.DateTimeField(null=True, blank=True)
     date_scraped = models.DateTimeField(null=True, blank=True)
+    additional_amenities = models.JSONField(null=True, blank=True)
