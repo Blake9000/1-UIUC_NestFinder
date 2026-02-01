@@ -17,6 +17,7 @@ scraped, we will drop the posting after a certain amount of time
 class Sublease(models.Model):
     price = models.FloatField(null=True, blank=True)
     address = models.TextField()
+    name = models.TextField(null=True, blank=True)
     social_media_site = models.ForeignKey(SocialMediaSite, on_delete=models.CASCADE, null=True, blank=True)
     apartments_images = models.ImageField(null=True, blank=True)
     apartments_url = models.URLField(null=True, blank=True)

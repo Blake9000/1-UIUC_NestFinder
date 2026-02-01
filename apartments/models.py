@@ -14,6 +14,7 @@ The apartment model will hold all the information regarding the apartment offere
 
 class Apartment(models.Model):
     price = models.FloatField(null=True, blank=True)
+    name = models.TextField(null=True, blank=True)
     address = models.TextField()
     leasingCompany = models.ForeignKey(LeasingCompany, on_delete=models.CASCADE, null=True, blank=True)
     apartments_images = models.ImageField(null=True, blank=True)
