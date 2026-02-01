@@ -1,0 +1,3 @@
+A1.4 Names:
+We chose the names apartments and sublease because they represent the data they will hold. They are also separate because the process by which we pull the data will be different.
+For the profile, that will hold more data such as favorites of the user.
