@@ -1,4 +1,17 @@
 from django.db import models
+import os
+from datetime import datetime
+
+'''
+Helper method for naming images
+'''
+def timestamped_image_path(instance, filename):
+    base, ext = os.path.splitext(filename)
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    new_name = f"{base}-{timestamp}{ext}"
+    return f"sublease_images/{new_name}"
+
+
 
 '''
 The social media site model will hold information regarding the social media site which we pulled the sublease information from.
@@ -19,7 +32,7 @@ class Sublease(models.Model):
     address = models.TextField()
     name = models.TextField(null=True, blank=True)
     social_media_site = models.ForeignKey(SocialMediaSite, on_delete=models.CASCADE, null=True, blank=True)
-    apartments_images = models.ImageField(null=True, blank=True)
+    apartments_images = models.URLField(null=True, blank=True)
     apartments_url = models.URLField(null=True, blank=True)
     bedrooms = models.IntegerField(null=True, blank=True)
     bathrooms = models.IntegerField(null=True, blank=True)
@@ -35,4 +48,20 @@ class Sublease(models.Model):
     date_scraped = models.DateTimeField(null=True, blank=True)
     additional_amenities = models.JSONField(null=True, blank=True)
 
+    def __str__(self):
+        return f"{self.name} at {self.address}"
 
+
+
+'''
+Extra images stored here
+'''
+
+
+class SubleaseImages(models.Model):
+    sublease = models.ForeignKey(Sublease, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to=timestamped_image_path)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Image for {self.image}"
