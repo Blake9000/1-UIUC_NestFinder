@@ -1,11 +1,16 @@
 from django.db import models
 
-
+'''
+The leasing company model will hold information regarding the company offering to lease the apartments.
+'''
 class LeasingCompany(models.Model):
     name = models.TextField(null=True, blank=True)
     url = models.TextField(null=True, blank=True)
     address = models.TextField(null=True, blank=True)
 
+'''
+The apartment model will hold all the information regarding the apartment offered by the leasing company.
+'''
 
 class Apartment(models.Model):
     price = models.FloatField(null=True, blank=True)

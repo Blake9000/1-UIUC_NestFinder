@@ -1,9 +1,18 @@
 from django.db import models
 
-
+'''
+The social media site model will hold information regarding the social media site which we pulled the sublease information from.
+'''
 class SocialMediaSite(models.Model):
     name = models.TextField(null=True, blank=True)
     url = models.TextField(null=True, blank=True)
+
+'''
+The sublease model will hold all the information regarding the sublease we were able to find.
+Additionally, we will store the date this info was scraped and when it was posted. Since this is 
+scraped, we will drop the posting after a certain amount of time 
+'''
+
 
 class Sublease(models.Model):
     price = models.FloatField(null=True, blank=True)

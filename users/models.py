@@ -6,6 +6,9 @@ from apartments.models import Apartment
 
 
 # Create your models here.
+'''
+The Profile model will allow us to add favorites to the built in user model.
+'''
 
 class Profile (models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
