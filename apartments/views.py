@@ -11,3 +11,5 @@ class ListingView(ListView):
     model = Apartment
     context_object_name = 'listings'
     template_name = 'listings/listing_list.html'
+
+
