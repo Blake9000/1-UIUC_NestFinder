@@ -1,7 +1,13 @@
 from django.http import HttpResponse
 from django.shortcuts import render
+from django.views.generic import ListView
+
+from apartments.models import Apartment
+
 
 # Create your views here.
 
-def home_view(request):
-    return render(request, 'base.html')
+class ListingView(ListView):
+    model = Apartment
+    context_object_name = 'listing'
+    template_name = 'listings/listing_list.html'
