@@ -14,6 +14,6 @@ class ListingView(ListView):
 
 
 class ListingDetailView(DetailView):
-    model = Apartment,
-    template_name = 'listings/listing_detail.html',
-    context_object_name = 'listing_detail'
+    model = Apartment
+    template_name = 'listings/listing_detail.html'
+    context_object_name = 'listing'

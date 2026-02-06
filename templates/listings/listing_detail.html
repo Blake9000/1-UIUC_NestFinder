@@ -1,33 +1,179 @@
 {% extends "base.html" %}
 
 {% block title %}
-    Listing Detail
+  Listing Detail for {{ listing.name}}
 {% endblock %}
 
 {% block content %}
-    <h1>Listings</h1>
+<div class="container py-4">
 
-        {% for listing in listings %}
+  <div class="card shadow-sm">
+    <div class="card-body">
 
-            <div>
-                <h3>{{ listing.name }}</h3>
+      <div class="d-flex justify-content-between align-items-start gap-3">
+        <div>
+          <h1 class="h4 mb-1">
+            {{ listing.name }}
+          </h1>
+          <div class="text-muted">{{ listing.address }}</div>
+        </div>
 
-                    <p>{{ listing.address }}</p>
-                    <p>${{ listing.price }}</p>
-
-                    <a href="{# {%  url 'listing_detail' listing.id %} #}">
-                        View Details
-                    </a>
-
+        {% if listing.price %}
+          <div class="text-end">
+            <div class="fs-5 fw-semibold">
+              ${{ listing.price}}
             </div>
+            <div class="text-muted small">per month</div>
+          </div>
+        {% endif %}
+      </div>
 
-        <!-- Step 2: This function tells what to return in case table has no data. -->
-        {% empty %}
+      <hr>
 
-            <li>No listings found. Try adjusting your filter.</li>
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        {% if listing.bedrooms is not None %}
+          <span class="badge text-bg-secondary">
+            {{ listing.bedrooms }} bd
+          </span>
+        {% endif %}
+        {% if listing.bathrooms is not None %}
+          <span class="badge text-bg-secondary">
+            {{ listing.bathrooms }} ba
+          </span>
+        {% endif %}
+        {% if listing.sqft_living %}
+          <span class="badge text-bg-secondary">
+            {{ listing.sqft_living }} sqft
+          </span>
+        {% endif %}
+        {% if listing.floors %}
+          <span class="badge text-bg-secondary">
+            {{ listing.floors }} floor{% if listing.floors != 1 %}s{% endif %}
+          </span>
+        {% endif %}
+        {% if listing.housing_type %}
+          <span class="badge text-bg-secondary">
+            {{ listing.housing_type }}
+          </span>
+        {% endif %}
+      </div>
 
-        <!-- Step 3: Tell html here that the for loop has ended.-->
-        {% endfor %}
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <div class="small text-muted">Pets</div>
+          <div>
+            {% if listing.pets is True %}Yes
+            {% elif listing.pets is False %}No
+            {% else %}Unknown
+            {% endif %}
+          </div>
+        </div>
 
+        <div class="col-md-4">
+          <div class="small text-muted">Furnished</div>
+          <div>
+            {% if listing.furnished is True %}Yes
+            {% elif listing.furnished is False %}No
+            {% else %}Unknown
+            {% endif %}
+          </div>
+        </div>
 
+        <div class="col-md-4">
+          <div class="small text-muted">Internet</div>
+          <div>
+            {{ listing.internet}}
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="small text-muted">Washer/Dryer in unit</div>
+          <div>
+            {% if listing.washer_dryer_in_unit is True %}Yes
+            {% elif listing.washer_dryer_in_unit is False %}No
+            {% else %}Unknown
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="small text-muted">Washer/Dryer on site</div>
+          <div>
+            {% if listing.washer_dryer_out_unit is True %}Yes
+            {% elif listing.washer_dryer_out_unit is False %}No
+            {% else %}Unknown
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {% if listing.additional_amenities %}
+        <hr>
+        <h2 class="h6">Additional amenities</h2>
+
+        {% if listing.additional_amenities.items %}
+          <dl class="row mb-0">
+            {% for key, value in listing.additional_amenities.items %}
+              <dt class="col-sm-4 col-lg-3 text-muted">{{ key }}</dt>
+              <dd class="col-sm-8 col-lg-9">
+                {% if value is True %}Yes
+                {% elif value is False %}No
+                {% elif value is None %}<span class="text-muted">Unknown</span>
+                {% else %}{{ value }}
+                {% endif %}
+              </dd>
+            {% endfor %}
+          </dl>
+        {% else %}
+          <pre class="mb-0">{{ listing.additional_amenities}}</pre>
+        {% endif %}
+      {% endif %}
+
+      <hr>
+
+      <div class="d-flex flex-column gap-1 small text-muted">
+        {% if listing.leasingCompany %}
+          <div>
+            Leasing company:
+            <strong>{{ listing.leasingCompany.name}}</strong>
+          </div>
+        {% endif %}
+
+        {% if listing.date_posted %}
+          <div>Posted: {{ listing.date_posted}}</div>
+        {% endif %}
+
+        {% if listing.date_scraped %}
+          <div>Scraped: {{ listing.date_scraped}}</div>
+        {% endif %}
+      </div>
+
+      <div class="mt-3 d-flex gap-2">
+        {% if listing.apartments_url %}
+          <a
+            href="{{ listing.apartments_url }}"
+            target="_blank"
+            rel="noopener"
+            class="btn btn-primary"
+          >
+            View listing
+          </a>
+        {% endif %}
+
+        {% if listing.leasingCompany and listing.leasingCompany.url %}
+          <a
+            href="{{ listing.leasingCompany.url }}"
+            target="_blank"
+            rel="noopener"
+            class="btn btn-outline-secondary"
+          >
+            Leasing company site
+          </a>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+</div>
 {% endblock %}
