@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<main class="container d-flex justify-content-center pt-5" style="min-height: 60vh;">
+    <div class="w-100" style="max-width: 400px;">
+        <h1 class="mb-4 text-center fw-semibold fs-3">Login</h1>
+
+        {% for message in messages %}
+            <div class="text-center text-danger mb-2">
+                {{ message }}
+            </div>
+        {% endfor %}
+
+        <form method="post" class="vstack gap-3">
+            {% csrf_token %}
+
+            <div>
+                <label for="username" class="form-label">Username</label>
+                <input
+                    id="username"
+                    name="username"
+                    required
+                    class="form-control">
+            </div>
+
+            <div>
+                <label for="password" class="form-label">Password</label>
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    required
+                    class="form-control">
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">
+                Login
+            </button>
+        </form>
+    </div>
+</main>
+{% endblock %}
