@@ -1,8 +1,33 @@
 {% extends "base.html" %}
 
-{% block title %}Listings{% endblock %}
+{% block title %}
+    Listings
+{% endblock %}
 
 {% block content %}
-<h1>Listings</h1>
+    <h1>Listings</h1>
+
+        {% for listing in listings %}
+
+            <div>
+                <h3>{{ listing.name }}</h3>
+
+                    <p>{{ listing.address }}</p>
+                    <p>${{ listing.price }}</p>
+
+                    <a href="{%  url 'listing_detail' listing.id %}">
+                        View Details
+                    </a>
+
+            </div>
+
+        <!-- Step 2: This function tells what to return in case table has no data. -->
+        {% empty %}
+
+            <li>No listings found. Try adjusting your filter.</li>
+
+        <!-- Step 3: Tell html here that the for loop has ended.-->
+        {% endfor %}
+
 
 {% endblock %}
