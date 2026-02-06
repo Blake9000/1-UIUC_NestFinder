@@ -1,20 +1,37 @@
-<!DOCTYPE html>
+{% load static %}
+<!doctype html>
 <html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+        <title>{% block title %}NestFinder{% endblock %}</title>
+        {% block head %}{% endblock %}
+    </head>
+</html>
+<body class="min-h-screen bg-slate-100 text-slate-950">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
 
-<head>
-    <meta charset="UTF-8">
-    <title>{% block title %}NestFinder{% endblock %}</title>
-</head>
-
-<body>
   <header>
 
-    <a href="{% url 'home' %}">NestFinder</a>
 
     <nav>
-      <a href="{% url 'listing_list %}">Listings</a>
-      <a href="{% url 'favorites %}">Saved</a>
-      <a href="{% url 'login %}">Login</a>
+         <div class="container-fluid">
+            <a class="navbar-brand fw-semibold" href="{% url 'home' %}">
+          <i class="bi bi-diagram-3 me-2"></i>Net Toolkit
+        </a>
+             <ul class="text-right nav-content">
+                 <li class="nav-item">
+                     <a class="nav-link" href="{% url 'listing_list' %}">Listings</a>
+                 </li>
+                 <li class="nav-item">
+                     <a class="nav-link" href="{% url 'favorites' %}">Favorites</a>
+                 </li>
+                 <li class="nav-item">
+                     <a class="nav-link" href="{% url 'login' %}">Login</a>
+                 </li>
+             </ul>
+         </div>
     </nav>
 
   </header>
@@ -23,4 +40,7 @@
 {% endblock %}
 
 </body>
-</html>
+
+<footer class="">
+
+</footer>
