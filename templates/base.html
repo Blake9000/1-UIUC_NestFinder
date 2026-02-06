@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}NestFinder{% endblock %}</title>
+</head>
+
+<body>
+  <header>
+
+    <a href="{% url 'home' %}">NestFinder</a>
+
+    <nav>
+      <a href="{% url 'listing_list %}">Listings</a>
+      <a href="{% url 'favorites %}">Saved</a>
+      <a href="{% url 'login %}">Login</a>
+    </nav>
+
+  </header>
+
+{% block content %}
+{% endblock %}
+
+</body>
+</html>
