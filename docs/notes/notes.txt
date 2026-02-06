@@ -1,3 +1,26 @@
 A1.4 Names:
 We chose the names apartments and sublease because they represent the data they will hold. They are also separate because the process by which we pull the data will be different.
 For the profile, that will hold more data such as favorites of the user.
+
+A2 Project foundations + Views + Templates:
+Views:
+ListingView -
+This view is for showing all of the listings. Currently it shows all the apartments we have added to the database. It doesn't look super fancy now, but we will work on the styling a bit later. We used a list view for this
+since that class based view has all the functionality we need.
+
+ListingDetailView -
+This view shows the details of the listing. It is made nice with CSS. We used a detail view for this since it provides us with the details we need and allows us to quickly make the template which has had the time put
+in for the styling.
+
+About-
+This view is a simple request. Since it doesn't need any data from the database, a simple request view is able to put everything together for this section.
+
+Login-
+We used this one to demonstrate httpresponse. Since we haven't learned about authentication in the class yet, we are using this as a placeholder until we add functionality to this page. This is why we used httpresponse instead
+of some of the better options.
+
+Bonus points:
+Render and generic CBVs feel a lot simpler to use compared to the Base CBV and HttpResponse. They can be set up in only a couple lines and provide fairly advanced capabilitues.
+The advantages of HttpResponse and the BaseCBV seems to be in our ability to add advanced functionalites.
+Overall, it feels like we'll be using render or Generic CBVs a lot more often and sometimes use HTTPResponse and BaseCBVs for their flexibility and customizability.
+
