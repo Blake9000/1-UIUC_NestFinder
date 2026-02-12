@@ -1,4 +1,4 @@
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.generic import ListView, DetailView
 from django.shortcuts import render, get_object_or_404
@@ -25,3 +25,11 @@ class ListingDetailView(View):
         }
 
         return render(request, self.template_name, context)
+
+class ApartmentsAPI(View):
+    def get(self,request):
+        apartments = Apartment.objects.all()
+        qs = {}
+        qs.update({'apartments':apartments})
+        data = {key: list(value.values()) for key, value in qs.items()}
+        return JsonResponse({"ok":True, "data":data})
