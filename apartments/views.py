@@ -33,3 +33,4 @@ class ApartmentsAPI(View):
         qs.update({'apartments':apartments})
         data = {key: list(value.values()) for key, value in qs.items()}
         return JsonResponse({"ok":True, "data":data})
+
