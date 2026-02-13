@@ -25,6 +25,10 @@ The advantages of HttpResponse and the BaseCBV seems to be in our ability to add
 Overall, it feels like we'll be using render or Generic CBVs a lot more often and sometimes use HTTPResponse and BaseCBVs for their flexibility and customizability.
 
 A3:
+
+Section 3 - Static files and UI styling:
+We added a custom css file to adjust the layout and the font and colors. Right now, the layout is not fully satisfying what we're expecting, but more adjustments will be made later on. We chose to put static folder in the project level because we only have 3 apps, which we think there's no need to have static folder in each app. For cache busting, we implemented it using `ManifestStaticFilesStorage`. By doing this, we can make sure that the browser downloads the newest version instead of an old cached copy.
+
 Section 4 - Creating the matplotlib chart:
 We're not going to use matplotlib to generate our map chart, preferably we'll use front-end charts using Javascript.
 
