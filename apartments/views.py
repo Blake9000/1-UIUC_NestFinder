@@ -8,6 +8,7 @@ from apartments.models import Apartment
 import json
 from io import BytesIO
 import matplotlib.pyplot as plt
+import matplotlib
 from django.urls import reverse
 
 # Create your views here.
@@ -50,7 +51,7 @@ class ApartmentsAPI(View):
 
 
 
-
+matplotlib.use('Agg')
 def apartment_price_chart_png(request):
     rows = Apartment.objects.all().values('name', 'price').order_by('-price')
 
