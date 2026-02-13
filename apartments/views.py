@@ -19,7 +19,7 @@ class ListingView(ListView):
     template_name = 'listings/listing_list.html'
 
     def get_queryset(self):
-        q = self.request.GET.get('q')
+        q = self.request.GET.get('q') or self.request.POST.get('q')
         qs = Apartment.objects.all()
 
         if q:
@@ -36,12 +36,16 @@ class ListingView(ListView):
         ctx = super().get_context_data(**kwargs)
 
         base_qs = self.get_queryset()
-        q = self.request.GET.get('q')
+        q = self.request.GET.get('q') or self.request.POST.get('q')
 
         ctx['q']=q
         ctx['total'] = base_qs.count()
 
         return ctx
+
+    def post(self, request, *args, **kwargs):
+        return self.get(request, *args, **kwargs)
+
 
 class ListingDetailView(View):
     template_name = 'listings/listing_detail.html'

@@ -26,7 +26,25 @@
             </div>
         </form>
         <div class="col-md-6">
-            <input type="text" class="form-control" placeholder="Search with post">
+            <form method="post" class="col-md-6">
+            {% csrf_token %}
+            <div class="input-group">
+                <input
+                    type="search"
+                    name="q"
+                    class="form-control"
+                    placeholder="Search with get"
+                    value="{% if q %}{{ q }}{% endif %}"
+                >
+                <button
+                    type="submit"
+                    class="btn btn-primary"
+                >
+                    Search
+                </button>
+            </div>
+        </form>
+
         </div>
     </div>
 
