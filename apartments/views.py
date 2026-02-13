@@ -8,6 +8,7 @@ from apartments.models import Apartment
 import json
 from io import BytesIO
 import matplotlib.pyplot as plt
+import matplotlib
 from django.urls import reverse
 
 # Create your views here.
@@ -50,21 +51,18 @@ class ApartmentsAPI(View):
 
 
 
-
+matplotlib.use('Agg')
 def apartment_price_chart_png(request):
-    api_url = request.build_absolute_uri(reverse('apartments:price-chart'))
+    rows = Apartment.objects.all().values('name', 'price', 'sqft_living').order_by('-price')
 
-    #fetching json data from the API
-    rows = Apartment.objects.all('name', 'price').order_by('-price')
-
-    labels = [r['name'] for r in rows]
+    labels = [r['name']+" - "+str(r["sqft_living"])+"sqft" for r in rows]
     prices = [r['price'] for r in rows]
 
     fig, ax = plt.subplots(figsize=(10,10), dpi=200 )
     ax.bar(labels, prices)# I could add color
     ax.set_title('Apartment Price Chart Comparison')
     ax.set_ylabel('Rent USD($)')
-    ax.set_xticks(labels, rotation=90, ha='right')
+    ax.set_xticks(ticks=list(range(len(labels))),labels=labels, rotation=45, ha='right')
     fig.tight_layout()
 
     buf = BytesIO()
