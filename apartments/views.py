@@ -53,9 +53,9 @@ class ApartmentsAPI(View):
 
 matplotlib.use('Agg')
 def apartment_price_chart_png(request):
-    rows = Apartment.objects.all().values('name', 'price').order_by('-price')
+    rows = Apartment.objects.all().values('name', 'price', 'sqft_living').order_by('-price')
 
-    labels = [r['name'] for r in rows]
+    labels = [r['name']+" - "+str(r["sqft_living"])+"sqft" for r in rows]
     prices = [r['price'] for r in rows]
 
     fig, ax = plt.subplots(figsize=(10,10), dpi=200 )
