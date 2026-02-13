@@ -72,13 +72,18 @@
             {% endfor %}
         </div>
 
-        <div class="col-md-8">
-            <div class="border rounded d-flex align-items-center justify-content-center"
-                 style="height: 80vh; background-color: #f8f9fa;">
-                <span class="text-muted">Map will appear here</span>
-            </div>
-        </div>
+            <div class="col-md-8">
+                <div class="border rounded d-flex align-items-center justify-content-center overflow-hidden"
+                     style="height: 80vh; background-color: #f8f9fa;">
 
+                    <div class="w-100 h-100 d-flex align-items-center justify-content-center">
+                        <img src="{% url 'test_chart' %}"
+                             class="img-fluid"
+                             style="max-height: 100%; object-fit: contain;">
+                    </div>
+
+                </div>
+            </div>
     </div>
 </div>
 {% endblock %}
