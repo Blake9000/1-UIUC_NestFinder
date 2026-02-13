@@ -18,6 +18,30 @@ class ListingView(ListView):
     context_object_name = 'listings'
     template_name = 'listings/listing_list.html'
 
+    def get_queryset(self):
+        q = self.request.GET.get('q')
+        qs = Apartment.objects.all()
+
+        if q:
+            qs = qs.filter(
+                Q(name__icontains=q) |
+                Q(address__icontains=q) |
+                Q(floors__icontains=q) |
+                Q(leasingCompany__name__icontains=q) |
+                Q(bedrooms__icontains=q)
+            )
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+
+        base_qs = self.get_queryset()
+        q = self.request.GET.get('q')
+
+        ctx['q']=q
+        ctx['total'] = base_qs.count()
+
+        return ctx
 
 class ListingDetailView(View):
     template_name = 'listings/listing_detail.html'
