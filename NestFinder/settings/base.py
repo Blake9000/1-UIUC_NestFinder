@@ -120,6 +120,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'ui-ux' / 'static'
 STATICFILES_DIRS = [BASE_DIR / "NestFinder/ui-ux/static"]
 
 # Default primary key field type
