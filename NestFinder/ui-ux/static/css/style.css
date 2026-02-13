@@ -10,3 +10,7 @@ h1, h2, h3, h4, h5 {
   color: #13294B;   /* Illinois blue fallback */
   letter-spacing: 0.2px;
 }
+
+.horizontal-card .card-body {
+  padding: 2rem 2.5rem
+}
