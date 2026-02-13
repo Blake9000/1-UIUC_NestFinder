@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.generic import ListView, DetailView
@@ -28,9 +29,19 @@ class ListingDetailView(View):
 
 class ApartmentsAPI(View):
     def get(self,request):
+        q = request.GET.get('q')
         apartments = Apartment.objects.all()
-        qs = {}
-        qs.update({'apartments':apartments})
-        data = {key: list(value.values()) for key, value in qs.items()}
+        if q:
+            apartments = apartments.filter(
+                Q(price__icontains=q) |
+                Q(address__icontains=q) |
+                Q(name__icontains=q) |
+                Q(floors__icontains=q) |
+                Q(bedrooms__icontains=q) |
+                Q(bathrooms__icontains=q) |
+                Q(additional_amenities__icontains=q)
+            )
+        data = list(apartments.values())
+
         return JsonResponse({"ok":True, "data":data})
 
