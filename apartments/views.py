@@ -62,7 +62,7 @@ def apartment_price_chart_png(request):
     ax.bar(labels, prices)# I could add color
     ax.set_title('Apartment Price Chart Comparison')
     ax.set_ylabel('Rent USD($)')
-    ax.set_xticks(ticks=list(range(len(labels))),labels=labels, rotation=90, ha='right')
+    ax.set_xticks(ticks=list(range(len(labels))),labels=labels, rotation=45, ha='right')
     fig.tight_layout()
 
     buf = BytesIO()
