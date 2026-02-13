@@ -52,10 +52,7 @@ class ApartmentsAPI(View):
 
 
 def apartment_price_chart_png(request):
-    api_url = request.build_absolute_uri(reverse('apartments:price-chart'))
-
-    #fetching json data from the API
-    rows = Apartment.objects.all('name', 'price').order_by('-price')
+    rows = Apartment.objects.all().values('name', 'price').order_by('-price')
 
     labels = [r['name'] for r in rows]
     prices = [r['price'] for r in rows]
@@ -64,7 +61,7 @@ def apartment_price_chart_png(request):
     ax.bar(labels, prices)# I could add color
     ax.set_title('Apartment Price Chart Comparison')
     ax.set_ylabel('Rent USD($)')
-    ax.set_xticks(labels, rotation=90, ha='right')
+    ax.set_xticks(ticks=list(range(len(labels))),labels=labels, rotation=90, ha='right')
     fig.tight_layout()
 
     buf = BytesIO()
