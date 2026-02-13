@@ -24,3 +24,11 @@ Render and generic CBVs feel a lot simpler to use compared to the Base CBV and H
 The advantages of HttpResponse and the BaseCBV seems to be in our ability to add advanced functionalites.
 Overall, it feels like we'll be using render or Generic CBVs a lot more often and sometimes use HTTPResponse and BaseCBVs for their flexibility and customizability.
 
+A3:
+
+Section 6 - Creating APIs:
+While we made both a manual HTTPResponse and JSONResponse API, we will primarily use JSONResponse for our APIs as they are simple and have all the
+functionality that we need.
+
+We are planning to serve the data on apartments that we have stored. You will be able to get our complete list of apartments or subleases in one spot
+as one file. We also added search functionality, allowing you to search the name, address, price, and some other attribues. This is also delivered as a JSON file.
