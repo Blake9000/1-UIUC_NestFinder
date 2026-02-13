@@ -52,6 +52,7 @@
 
         <div class="col-md-4" style="max-height: 80vh; overflow-y: auto;">
             <h4 class="mb-3">Listings {% if total %} ({{ total }}){% endif %}</h4>
+            <p>Total Leasing Companies: {{ num_leasing }}</p>
 
             {% for listing in listings %}
                 <div class="card mb-3">

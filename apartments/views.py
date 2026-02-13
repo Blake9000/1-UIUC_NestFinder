@@ -1,4 +1,5 @@
 from django.db.models import Q
+from django.db.models.aggregates import Count
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.generic import ListView, DetailView
@@ -40,7 +41,7 @@ class ListingView(ListView):
 
         ctx['q']=q
         ctx['total'] = base_qs.count()
-
+        ctx['num_leasing'] = base_qs.values('leasingCompany__name').annotate(total=Count('leasingCompany')).count()
         return ctx
 
     def post(self, request, *args, **kwargs):
