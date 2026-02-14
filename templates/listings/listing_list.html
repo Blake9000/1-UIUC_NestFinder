@@ -61,7 +61,7 @@
                         <p class="card-text mb-1">{{ listing.address }}</p>
                         <p class="fw-bold mb-2">${{ listing.price }}</p>
 
-                        <a href="{% url 'listing_detail' listing.id %}"
+                        <a href="{{ listing.get_absolute_url }}"
                            class="btn btn-primary btn-sm">
                             View Details
                         </a>
@@ -78,6 +78,7 @@
 
                     <div class="w-100 h-100 d-flex align-items-center justify-content-center">
                         <img src="{% url 'test_chart' %}"
+                             alt="Chart displaying the different prices of apartments"
                              class="img-fluid"
                              style="max-height: 100%; object-fit: contain;">
                     </div>
