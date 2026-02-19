@@ -8,4 +8,5 @@ urlpatterns = [
      path('test/chart/', apartment_price_chart_png, name='test_chart'),
      path('apartments/api/pricing', apartment_price_api, name='vega_lite_price_api'),
      path("apartments/api/map/", StreetMap.as_view(), name="api-map"),
+     path("export/apartments/", export_apartments_csv, name="export_apartments"),
 ]
