@@ -100,3 +100,43 @@ def apartment_price_chart_png(request):
     buf.seek(0)
     return HttpResponse(buf.getvalue(), content_type='image/png')
 
+import requests
+
+class StreetMap(View):
+
+    def get(self, request):
+
+        # Prepare parameters for the API request
+        params = {
+            # Champaign, IL
+            "lat": 40.1138,        # Champaign, IL latitude
+            "lon": -88.2260,      # Champaign, IL longitude
+            "format": "json",
+        }
+
+        headers = {
+            "User-Agent": "NestFinder/1.0 (lh32@illinois.edu)"
+        }
+
+        try:
+
+            output_raw_all = requests.get("https://nominatim.openstreetmap.org/reverse",
+                             params=params, headers=headers, timeout=5)
+
+            # Raise an error if the HTTP status code indicates a problem (e.g., 404, 500)
+            output_raw_all.raise_for_status()
+
+            # Convert the response (which is text) into a Python dictionary
+            # Return the entire raw JSON as-is for exploration
+            # (This can be very large so use carefully in production!)
+            output_polished_all = output_raw_all.json()
+            return JsonResponse(output_polished_all, safe=False)
+
+        # If *any* network or parsing error occurs, handle it gracefully
+        except requests.exceptions.RequestException as e:
+
+            # Return a 502 (Bad Gateway) response with an error message
+            # This helps us diagnose connectivity or API issues
+            return JsonResponse({"ok": False, "error": str(e)}, status=502)
+
+
