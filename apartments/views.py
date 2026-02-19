@@ -167,7 +167,7 @@ def export_apartments_csv(request):
 
     # Header row
     writer.writerow([
-        "id", "name", "address", "price", "floors", "bedrooms", "bathrooms", "sqft_living","leasing_company"
+         "name", "address", "price", "floors", "bedrooms", "bathrooms", "sqft_living","leasingCompany"
     ])
 
     # STEP 4: Query DB
@@ -175,7 +175,7 @@ def export_apartments_csv(request):
         Apartment.objects
         .select_related("leasingCompany")
         .values_list(
-            "id", "name", "address", "price", "floors", "bedrooms", "bathrooms", "sqft_living", "leasing_company"
+             "name", "address", "price", "floors", "bedrooms", "bathrooms", "sqft_living", "leasingCompany"
         )
         .order_by("price")
     )
