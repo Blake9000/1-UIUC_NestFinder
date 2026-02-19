@@ -77,14 +77,62 @@
                      style="height: 80vh; background-color: #f8f9fa;">
 
                     <div class="w-100 h-100 d-flex align-items-center justify-content-center">
-                        <img src="{% url 'test_chart' %}"
-                             alt="Chart displaying the different prices of apartments"
-                             class="img-fluid"
-                             style="max-height: 100%; object-fit: contain;">
+{#                        <img src="{% url 'test_chart' %}"#}
+{#                             alt="Chart displaying the different prices of apartments"#}
+{#                             class="img-fluid"#}
+{#                             style="max-height: 100%; object-fit: contain;">#}
+                        <div id="vega_chart_price" style="width: 100%; height: 100%;"></div>
                     </div>
 
                 </div>
             </div>
     </div>
 </div>
+
+<script type="text/javascript">
+    var spec = {
+        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+        "width": "container",   // Automatically fits the width of your col-md-8
+        "height": 400,
+        "title": "Apartment Prices",
+
+        // DATA CONFIGURATION
+        "data": {
+            // Replace 'apartment_price_api_url_name' with the actual name from your urls.py
+            "url": "{% url 'vega_lite_price_api' %}",
+
+            // CRITICAL: This tells Vega to look inside the "data" key of your JSON response
+            "format": {
+                "type": "json",
+                "property": "data"
+            }
+        },
+
+        "mark": "bar",
+
+        "encoding": {
+            "x": {
+                "field": "name",
+                "type": "nominal",
+                "axis": {"labelAngle": -45, "title": "Apartment Name"},
+                "sort": "-y" // Sorts the bars by price (highest to lowest)
+            },
+            "y": {
+                "field": "price",
+                "type": "quantitative",
+                "axis": {"title": "Price ($)"}
+            },
+            // Tooltips show extra info when you hover
+            "tooltip": [
+                {"field": "name", "type": "nominal", "title": "Name"},
+                {"field": "price", "type": "quantitative", "title": "Price"},
+                {"field": "sqft_living", "type": "quantitative", "title": "Sq Ft"}
+            ]
+        }
+    };
+
+    // Embed the chart
+    vegaEmbed('#vega_chart_price', spec).catch(console.warn);
+</script>
+
 {% endblock %}

@@ -21,3 +21,7 @@ DATABASES = {
         'NAME': BASE_DIR / 'data' / 'db.sqlite3',
     }
 }
+
+CORS_ALLOWED_ORIGINS = [
+    "https://vega.github.io",
+]
