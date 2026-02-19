@@ -139,4 +139,45 @@ class StreetMap(View):
             # This helps us diagnose connectivity or API issues
             return JsonResponse({"ok": False, "error": str(e)}, status=502)
 
+# ========================================
+# CSV export (I forgot to add the button) for Apartments
 
+import csv
+from datetime import datetime
+
+def export_apartments_csv(request):
+
+    #Generate and download a CSV file of all apartments.
+
+    # STEP 1: Timestamp for unique filename
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    filename = f"apartments_{timestamp}.csv"
+
+    # STEP 2: Prepare HttpResponse
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename=\"{filename}\"'
+
+    # STEP 3: CSV writer
+    writer = csv.writer(response)
+
+    # Header row
+    writer.writerow([
+        "id", "name", "address", "price", "floors", "bedrooms", "bathrooms", "sqft_living","leasing_company"
+    ])
+
+    # STEP 4: Query DB
+    rows = (
+        Apartment.objects
+        .select_related("leasingCompany")
+        .values_list(
+            "id", "name", "address", "price", "floors", "bedrooms", "bathrooms", "sqft_living", "leasing_company"
+        )
+        .order_by("price")
+    )
+
+    # STEP 5: Write rows
+    for row in rows:
+        writer.writerow(row)
+
+    # STEP 6: Return response
+    return response
