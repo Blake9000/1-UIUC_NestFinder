@@ -171,6 +171,16 @@
           </a>
         {% endif %}
       </div>
+    <div class="mt-3 d-flex gap-2">
+    <a href="{% url 'export-apartments-csv' %}" class="btn btn-success">
+        Download All Apartments (CSV)
+    </a>
+
+    <a href="{% url 'export-apartments-json' %}" class="btn btn-warning">
+        Download All Apartments (JSON)
+    </a>
+</div>
+
 
     </div>
   </div>

@@ -153,8 +153,7 @@ from datetime import datetime
 
 def export_apartments_csv(request):
 
-    #Generate and download a CSV file of all apartments.
-
+    #Generate and download a CSV file for all the apartments.
     # STEP 1: Timestamp for unique filename
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     filename = f"apartments_{timestamp}.csv"
