@@ -134,10 +134,10 @@
     // Embed the chart
     vegaEmbed('#vega_chart_price', spec).catch(console.warn);
 </script>
-    // export apartment is CSV export
+
       <a href="{%  url 'export_apartments' %}" class="btn btn-outline-secondary">
           Download CSV
       </a>
-    // JSON export
+
     <a href="{% url 'export_apartments_json' %}" class="btn btn-outline-warning ms-2"> Download JSON </a>
 {% endblock %}
