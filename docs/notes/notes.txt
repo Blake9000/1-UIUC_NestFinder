@@ -54,3 +54,5 @@ Section 1:
 The vega-lite charts are accessible through:
 /vega-lite/chart1
 /vega-lite/chart2
+Chart 1 is embedded in the Listing page.
+Chart 2 is embedded in the about page.
