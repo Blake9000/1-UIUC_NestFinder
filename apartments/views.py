@@ -146,7 +146,7 @@ class StreetMap(View):
             return JsonResponse({"ok": False, "error": str(e)}, status=502)
 
 # ========================================
-# CSV export (I forgot to add the button) for Apartments
+# CSV export for Apartments
 
 import csv
 from datetime import datetime
@@ -185,4 +185,44 @@ def export_apartments_csv(request):
         writer.writerow(row)
 
     # STEP 6: Return response
+    return response
+
+# ========================================
+# JSON export for Apartments
+
+from datetime import datetime
+from django.http import JsonResponse
+
+def export_apartments_json(request):
+    """
+    Generate and download a JSON file for all apartments.
+    Mirrors the CSV export but returns structured JSON data.
+    """
+
+    # STEP 1: Query DB (values() returns dictionaries, perfect for JSON)
+    rows = list(
+        Apartment.objects
+        .select_related("leasingCompany")
+        .values(
+            "name", "address", "price", "floors", "bedrooms", "bathrooms", "sqft_living", "leasingCompany",
+        )
+        .order_by("price")
+    )
+
+    # STEP 2: Build JSON structure with metadata
+    json_content = {
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "record_count": len(rows),
+        "apartments": rows,
+    }
+
+    # STEP 3: Create JsonResponse with pretty formatting
+    response = JsonResponse(json_content, json_dumps_params={"indent": 2})
+
+    # STEP 4: Timestamped filename + download header
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    filename = f"apartments_{timestamp}.json"
+    response["Content-Disposition"] = f'attachment; filename=\"{filename}\"'
+
+    # STEP 5: Return response
     return response
