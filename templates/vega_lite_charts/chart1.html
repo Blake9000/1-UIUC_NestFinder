@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Apartment Price Chart</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+
+    <style>
+        /* Optional: Basic styling to center the chart on the page */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f9;
+            font-family: sans-serif;
+        }
+        #chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 80%;
+            max-width: 900px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="chart-container">
+        <div id="vega_chart_price" style="width: 100%; height: 100%;"></div>
+    </div>
+
+    <script type="text/javascript">
+    var spec = {
+        "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+        "width": "container",
+        "height": 400,
+        "title": "Apartment Prices",
+
+        "data": {
+            "url": "{% url 'vega_lite_price_api' %}",
+            "format": {
+                "type": "json",
+                "property": "data"
+            }
+        },
+
+        "mark": "bar",
+
+        "encoding": {
+            "x": {
+                "field": "name",
+                "type": "nominal",
+                "axis": {"labelAngle": -45, "title": "Apartment Name"},
+                "sort": "-y"
+            },
+            "y": {
+                "field": "price",
+                "type": "quantitative",
+                "axis": {"title": "Price ($)"}
+            },
+            "tooltip": [
+                {"field": "name", "type": "nominal", "title": "Name"},
+                {"field": "price", "type": "quantitative", "title": "Price"},
+                {"field": "sqft_living", "type": "quantitative", "title": "Sq Ft"}
+            ]
+        }
+    };
+    vegaEmbed('#vega_chart_price', spec).catch(console.warn);
+</script>
+</body>
+</html>

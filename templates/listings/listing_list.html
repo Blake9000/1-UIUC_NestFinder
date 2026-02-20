@@ -92,16 +92,13 @@
 <script type="text/javascript">
     var spec = {
         "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
-        "width": "container",   // Automatically fits the width of your col-md-8
+        "width": "container",
         "height": 400,
         "title": "Apartment Prices",
 
-        // DATA CONFIGURATION
-        "data": {
-            // Replace 'apartment_price_api_url_name' with the actual name from your urls.py
-            "url": "{% url 'vega_lite_price_api' %}",
 
-            // CRITICAL: This tells Vega to look inside the "data" key of your JSON response
+        "data": {
+            "url": "{% url 'vega_lite_price_api' %}",
             "format": {
                 "type": "json",
                 "property": "data"
@@ -115,14 +112,13 @@
                 "field": "name",
                 "type": "nominal",
                 "axis": {"labelAngle": -45, "title": "Apartment Name"},
-                "sort": "-y" // Sorts the bars by price (highest to lowest)
+                "sort": "-y"
             },
             "y": {
                 "field": "price",
                 "type": "quantitative",
                 "axis": {"title": "Price ($)"}
             },
-            // Tooltips show extra info when you hover
             "tooltip": [
                 {"field": "name", "type": "nominal", "title": "Name"},
                 {"field": "price", "type": "quantitative", "title": "Price"},
@@ -130,8 +126,6 @@
             ]
         }
     };
-
-    // Embed the chart
     vegaEmbed('#vega_chart_price', spec).catch(console.warn);
 </script>
 

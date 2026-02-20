@@ -106,6 +106,10 @@ def apartment_price_api(request):
 
     return JsonResponse({"ok":True, "data":q}, safe=False)
 
+def chart1_view(request):
+
+    return render(request, 'vega_lite_charts/chart1.html')
+
 import requests
 
 class StreetMap(View):
