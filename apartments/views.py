@@ -1,5 +1,6 @@
 from django.db.models import Q
 from django.db.models.aggregates import Count
+from django.db.models.functions import TruncDate
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.generic import ListView, DetailView
@@ -109,6 +110,31 @@ def apartment_price_api(request):
 def chart1_view(request):
 
     return render(request, 'vega_lite_charts/chart1.html')
+
+def chart2_view(request):
+
+    return render(request, 'vega_lite_charts/chart2.html')
+
+def apartments_count_api(request):
+    qs = (
+        Apartment.objects
+        .annotate(date=TruncDate('date_scraped'))
+        .values('date')
+        .annotate(daily_count=Count('id'))
+        .order_by('date')
+    )
+    data = []
+    running_total = 0
+
+    for item in qs:
+        if item['date']:
+            running_total += item['daily_count']
+            data.append({
+                "date": str(item['date']),
+                "total": running_total
+            })
+
+    return JsonResponse({"ok": True, "data": data}, safe=False)
 
 import requests
 

@@ -32,46 +32,45 @@
 <body>
 
     <div id="chart-container">
-        <div id="vega_chart_price" style="width: 100%; height: 100%;"></div>
+            <div id="vega_line_chart" style="width: 100%;"></div>
     </div>
 
     <script type="text/javascript">
-    var spec = {
+    var lineSpec = {
         "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+        "title": "Number of Listings Over Time",
         "width": "container",
         "height": 400,
-        "title": "Apartment Prices",
 
         "data": {
-            "url": "{% url 'vega_lite_price_api' %}",
-            "format": {
-                "type": "json",
-                "property": "data"
-            }
+            "url": "{% url 'apartments_count_api' %}",
+            "format": {"type": "json", "property": "data"}
         },
 
-        "mark": "bar",
+        "mark": {
+            "type": "line",
+            "point": true
+        },
 
         "encoding": {
             "x": {
-                "field": "name",
-                "type": "nominal",
-                "axis": {"labelAngle": -45, "title": "Apartment Name"},
-                "sort": "-y"
+                "field": "date",
+                "type": "temporal",
+                "axis": {"title": "Date", "format": "%b %d, %Y"}
             },
             "y": {
-                "field": "price",
+                "field": "total",
                 "type": "quantitative",
-                "axis": {"title": "Price ($)"}
+                "axis": {"title": "Total Listings"}
             },
             "tooltip": [
-                {"field": "name", "type": "nominal", "title": "Name"},
-                {"field": "price", "type": "quantitative", "title": "Price"},
-                {"field": "sqft_living", "type": "quantitative", "title": "Sq Ft"}
+                {"field": "date", "type": "temporal", "title": "Date"},
+                {"field": "total", "type": "quantitative", "title": "Total Listings in DB"}
             ]
         }
     };
-    vegaEmbed('#vega_chart_price', spec).catch(console.warn);
+
+    vegaEmbed('#vega_line_chart', lineSpec).catch(console.error);
 </script>
 </body>
 </html>
