@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Apartment Price Chart</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+
+    <style>
+        /* Optional: Basic styling to center the chart on the page */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f9;
+            font-family: sans-serif;
+        }
+        #chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 80%;
+            max-width: 900px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="chart-container">
+            <div id="vega_line_chart" style="width: 100%;"></div>
+    </div>
+
+    <script type="text/javascript">
+    var lineSpec = {
+        "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+        "title": "Number of Listings Over Time",
+        "width": "container",
+        "height": 400,
+
+        "data": {
+            "url": "{% url 'apartments_count_api' %}",
+            "format": {"type": "json", "property": "data"}
+        },
+
+        "mark": {
+            "type": "line",
+            "point": true
+        },
+
+        "encoding": {
+            "x": {
+                "field": "date",
+                "type": "temporal",
+                "axis": {"title": "Date", "format": "%b %d, %Y"}
+            },
+            "y": {
+                "field": "total",
+                "type": "quantitative",
+                "axis": {"title": "Total Listings"}
+            },
+            "tooltip": [
+                {"field": "date", "type": "temporal", "title": "Date"},
+                {"field": "total", "type": "quantitative", "title": "Total Listings in DB"}
+            ]
+        }
+    };
+
+    vegaEmbed('#vega_line_chart', lineSpec).catch(console.error);
+</script>
+</body>
+</html>

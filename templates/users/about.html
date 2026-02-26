@@ -24,7 +24,47 @@
             minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit
             in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt
             mollit anim id est laborum.
-        </p>
+        </p><br><br><h3>Growth of our site</h3><br>
+            <div id="vega_line_chart" style="width: 100%;"></div>
     </div>
+
 </div>
+    <script type="text/javascript">
+    var lineSpec = {
+        "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+        "title": "Number of Listings Over Time",
+        "width": "container",
+        "height": 400,
+
+        "data": {
+            "url": "{% url 'apartments_count_api' %}",
+            "format": {"type": "json", "property": "data"}
+        },
+
+        "mark": {
+            "type": "line",
+            "point": true
+        },
+
+        "encoding": {
+            "x": {
+                "field": "date",
+                "type": "temporal",
+                "axis": {"title": "Date", "format": "%b %d, %Y"}
+            },
+            "y": {
+                "field": "total",
+                "type": "quantitative",
+                "axis": {"title": "Total Listings"}
+            },
+            "tooltip": [
+                {"field": "date", "type": "temporal", "title": "Date"},
+                {"field": "total", "type": "quantitative", "title": "Total Listings in DB"}
+            ]
+        }
+    };
+
+    vegaEmbed('#vega_line_chart', lineSpec).catch(console.error);
+</script>
 {% endblock %}
+

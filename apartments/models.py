@@ -48,6 +48,9 @@ class Apartment(models.Model):
 
     def __str__(self):
         return f"{self.name} at {self.address}"
+
+    def get_absolute_url(self):
+        return f"/detail/{self.pk}/"
 '''
 Extra images stored here
 '''

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<main class="container d-flex justify-content-center pt-5" style="min-height: 60vh;">
+    <div class="w-100" style="max-width: 400px;">
+        <h1 class="mb-4 text-center fw-semibold fs-3">Create Account</h1>
+
+        <form method="post" class="vstack gap-3">
+            {% csrf_token %}
+
+            <div>
+                <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
+                {{ form.username }}
+                {% if form.username.errors %}
+                    <div class="text-danger small mt-1">
+                        {{ form.username.errors }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div>
+                <label for="{{ form.email.id_for_label }}" class="form-label">Email</label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <div class="text-danger small mt-1">
+                        {{ form.email.errors }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div>
+                <label for="{{ form.password1.id_for_label }}" class="form-label">Password</label>
+                {{ form.password1 }}
+                {% if form.password1.errors %}
+                    <div class="text-danger small mt-1">
+                        {{ form.password1.errors }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <div>
+                <label for="{{ form.password2.id_for_label }}" class="form-label">Confirm Password</label>
+                {{ form.password2 }}
+                {% if form.password2.errors %}
+                    <div class="text-danger small mt-1">
+                        {{ form.password2.errors }}
+                    </div>
+                {% endif %}
+            </div>
+
+            {# Non-field errors (ex: "passwords do not match") #}
+            {% if form.non_field_errors %}
+                <div class="text-danger small text-center">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <div class="d-flex justify-content-center align-items-center gap-1">
+                <p class="mb-0">Already have an account?</p>
+                <a href="{% url 'login' %}">Login</a>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">
+                Register
+            </button>
+        </form>
+    </div>
+</main>
+{% endblock %}
