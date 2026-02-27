@@ -5,49 +5,102 @@
 {% endblock %}
 
 {% block content %}
-    <h1>Favorites</h1>
+    <h1 class="mb-4">Favorites</h1>
 
-        {% for listing in listings %}
+    <div class="row">
 
-            <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card border-0 shadow-sm rounded-4 overflow-hidden position-relative">
-                    <div class="card-body text-center py-4 px-4">
-                        {% if user.is_authenticated %}
-                        <form method="post"
-                              action="{% url 'toggle_favorite_apartment' listing.pk %}"
-                              class="position-absolute top-0 end-0 m-3 z-3">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    class="btn btn-light border rounded-circle"
-                                    style="width:40px;height:40px;">
-                                {% if listing.pk in favorite_ids %}♥{% else %}♡{% endif %}
-                            </button>
-                        </form>
-                        {% else %}
-                            <a href="{% url 'account_login' %}?next={{ request.path }}"
-                               class="position-absolute top-0 end-0 m-2 btn btn-light border rounded-circle"
-                               style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
-                                ♡
-                            </a>
-                        {% endif %}
-                        <h5 class="card-title">{{ listing.name }}</h5>
-                        <p class="card-text mb-1">{{ listing.address }}</p>
-                        <p class="fw-bold mb-2">${{ listing.price }}</p>
+        <div class="col-lg-8 col-md-12">
+            <div class="row">
+                {% for listing in listings %}
+                    <div class="col-md-6 mb-4">
+                        <div class="card border-0 shadow-sm rounded-4 overflow-hidden position-relative">
+                            <div class="card-body text-center py-4 px-4">
+                                {% if user.is_authenticated %}
+                                <form method="post"
+                                      action="{% url 'toggle_favorite_apartment' listing.pk %}"
+                                      class="position-absolute top-0 end-0 m-3 z-3">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="btn btn-light border rounded-circle"
+                                            style="width:40px;height:40px;">
+                                        {% if listing.pk in favorite_ids %}♥{% else %}♡{% endif %}
+                                    </button>
+                                </form>
+                                {% else %}
+                                    <a href="{% url 'account_login' %}?next={{ request.path }}"
+                                       class="position-absolute top-0 end-0 m-2 btn btn-light border rounded-circle"
+                                       style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+                                        ♡
+                                    </a>
+                                {% endif %}
+                                <h5 class="card-title">{{ listing.name }}</h5>
+                                <p class="card-text mb-1">{{ listing.address }}</p>
+                                <p class="fw-bold mb-2">${{ listing.price }}</p>
 
-                        <a href="{{ listing.get_absolute_url }}"
-                           class="btn btn-primary btn-sm">
-                            View Details
-                        </a>
+                                <a href="{{ listing.get_absolute_url }}"
+                                   class="btn btn-primary btn-sm">
+                                    View Details
+                                </a>
+                            </div>
+                        </div>
                     </div>
+                {% empty %}
+                    <p>No saved listings yet.</p>
+                {% endfor %}
+            </div> </div> <div class="col-lg-4 col-md-12">
+            <div class="card border-0 shadow-sm rounded-4 p-4 sticky-top" style="top: 20px;">
+                <h4 class="text-center mb-3">Favorites Breakdown</h4>
+                <div id="chart-container">
+                    <div id="vis-container" style="width: 100%; min-height: 350px;"></div>
                 </div>
+            </div>
+        </div> </div> <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
 
-        <!-- Step 2: This function tells what to return in case table has no data. -->
-        {% empty %}
+    <script>
+        const spec = {
+          "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+          "description": "Total favorites by category",
+          "width": "container",  // Add this line! It stops the chart from squishing
+          "height": 300,         // Set a static height
+          "data": {
+            "url": "{% url 'favorites_api' %}"
+          },
+          "mark": {
+            "type": "bar",
+            "cornerRadiusEnd": 4
+          },
+          "encoding": {
+            "x": {
+              "field": "category",
+              "type": "nominal",
+              "axis": {"labelAngle": 0},
+              "title": "Category",
+              "sort": ["Total Favorites", "Apartments", "Subleases"]
+            },
+            "y": {
+              "field": "count",
+              "type": "quantitative",
+              "title": "Number of Favorites"
+            },
+            "color": {
+              "field": "category",
+              "type": "nominal",
+              "legend": null,
+              "scale": {"range": ["#2ca02c", "#1f77b4", "#ff7f0e"]}
+            },
+            "tooltip": [
+              {"field": "category", "type": "nominal", "title": "Category"},
+              {"field": "count", "type": "quantitative", "title": "Total Count"}
+            ]
+          }
+        };
 
-            <li>No saved listings yet.</li>
-
-        <!-- Step 3: Tell html here that the for loop has ended.-->
-        {% endfor %}
-
+        // Add {actions: false} to hide the little three-dot menu if you want a cleaner look
+        vegaEmbed('#vis-container', spec, {actions: false}).then(function(result) {
+            console.log("Chart loaded side-by-side.");
+        }).catch(console.error);
+    </script>
 
 {% endblock %}

@@ -303,3 +303,20 @@ def toggle_favorite_apartment(request, pk):
     else:
         fav = Favorite.objects.create(user=request.user, apartment=apartment)
     return redirect(request.META.get('HTTP_REFERER'), 'listing')
+
+
+def apartments_favorite_api(request):
+
+    total_apartments = Favorite.objects.filter(apartment__isnull=False).count()
+
+    total_subleases = Favorite.objects.filter(sublease__isnull=False).count()
+
+    total_all = Favorite.objects.count()
+
+    data = [
+        {"category": "Total Favorites", "count": total_all},
+        {"category": "Apartments", "count": total_apartments},
+        {"category": "Subleases", "count": total_subleases}
+    ]
+
+    return JsonResponse(data, safe=False)
