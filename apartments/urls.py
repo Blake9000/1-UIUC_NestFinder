@@ -4,6 +4,7 @@ from .views import *
 urlpatterns = [
      path('', ListingView.as_view(), name='listing'),
      path('favorites/', FavoritesView.as_view(), name='favorites'),
+     path('favorites/apartment/toggle/<int:pk>/', toggle_favorite_apartment, name='toggle_favorite_apartment'),
      path('detail/<int:pk>/', ListingDetailView.as_view(), name='listing_detail'),
      path('apartments/api/',ApartmentsAPI.as_view(), name='apartments_api'),
      path('test/chart/', apartment_price_chart_png, name='test_chart'),
@@ -14,4 +15,5 @@ urlpatterns = [
      path("apartments/api/map/", StreetMap.as_view(), name="api-map"),
      path("export/apartments/", export_apartments_csv, name="export_apartments"),
      path("export/apartments/json/", export_apartments_json, name="export_apartments_json"),
+     #path("admin/scraping/", admin.site.admin_view(scraping_admin_view), name="admin_scraping"),
 ]
