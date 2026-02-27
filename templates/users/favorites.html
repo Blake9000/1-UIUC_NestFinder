@@ -9,17 +9,37 @@
 
         {% for listing in listings %}
 
-            <div>
-                <h3>{{ listing.name }}</h3>
+            <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card border-0 shadow-sm rounded-4 overflow-hidden position-relative">
+                    <div class="card-body text-center py-4 px-4">
+                        {% if user.is_authenticated %}
+                        <form method="post"
+                              action="{% url 'toggle_favorite_apartment' listing.pk %}"
+                              class="position-absolute top-0 end-0 m-3 z-3">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="btn btn-light border rounded-circle"
+                                    style="width:40px;height:40px;">
+                                {% if listing.pk in favorite_ids %}♥{% else %}♡{% endif %}
+                            </button>
+                        </form>
+                        {% else %}
+                            <a href="{% url 'account_login' %}?next={{ request.path }}"
+                               class="position-absolute top-0 end-0 m-2 btn btn-light border rounded-circle"
+                               style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+                                ♡
+                            </a>
+                        {% endif %}
+                        <h5 class="card-title">{{ listing.name }}</h5>
+                        <p class="card-text mb-1">{{ listing.address }}</p>
+                        <p class="fw-bold mb-2">${{ listing.price }}</p>
 
-                    <p>{{ listing.address }}</p>
-                    <p>${{ listing.price }}</p>
-
-                    <a href="{# {%  url 'listing_detail' listing.id %} #}">
-                        View Details
-                    </a>
-
-            </div>
+                        <a href="{{ listing.get_absolute_url }}"
+                           class="btn btn-primary btn-sm">
+                            View Details
+                        </a>
+                    </div>
+                </div>
 
         <!-- Step 2: This function tells what to return in case table has no data. -->
         {% empty %}
