@@ -3,7 +3,6 @@ from django.db.models import Q
 from django.db.models.aggregates import Count
 from django.db.models.functions import TruncDate
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render
 from django.views.generic import ListView, DetailView
 from django.shortcuts import render, get_object_or_404
 from django.views import View
@@ -12,7 +11,7 @@ import json
 from io import BytesIO
 import matplotlib.pyplot as plt
 import matplotlib
-from django.urls import reverse
+from django.shortcuts import render
 
 # Create your views here.
 
