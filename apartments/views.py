@@ -305,6 +305,7 @@ def toggle_favorite_apartment(request, pk):
     return redirect(request.META.get('HTTP_REFERER'), 'listing')
 
 
+@login_required
 def apartments_favorite_api(request):
 
     total_apartments = Favorite.objects.filter(apartment__isnull=False).count()
