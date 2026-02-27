@@ -100,11 +100,10 @@ def apartment_price_chart_png(request):
     plt.close(fig)
     buf.seek(0)
     return HttpResponse(buf.getvalue(), content_type='image/png')
-# lines 104 - 108 is our public API endpoint
+
+# lines 104 - 106 is our public API endpoint
 def apartment_price_api(request):
-
     q = list(Apartment.objects.all().values('name', 'price', 'sqft_living').order_by('-price'))
-
     return JsonResponse({"ok":True, "data":q}, safe=False)
 
 def chart1_view(request):
