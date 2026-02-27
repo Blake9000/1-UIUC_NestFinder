@@ -140,6 +140,12 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
+ACCOUNT_FORMS = {
+    "login": "users.forms.BootstrapLoginForm",
+    "signup": "users.forms.BootstrapSignupForm",
+}
+LOGIN_REDIRECT_URL = "listing"
+ACCOUNT_LOGOUT_REDIRECT_URL = "listing"
 ACCOUNT_LOGIN_METHODS = {"username", "email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "username*", "password1*", "password2*"]
 
