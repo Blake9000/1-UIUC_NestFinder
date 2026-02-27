@@ -11,7 +11,7 @@ STATIC_ROOT = BASE_DIR / 'static'
 STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
 
 # Replace it with your name:
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'https://bmackin2.pythonanywhere.com','bmackin2.pythonanywhere.com']
 
 # Database for the development server
 DATABASES = {
@@ -24,4 +24,5 @@ DATABASES = {
 
 CORS_ALLOWED_ORIGINS = [
     "https://vega.github.io",
+    'https://bmackin2.pythonanywhere.com',
 ]
