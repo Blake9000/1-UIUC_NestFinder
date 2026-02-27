@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load socialaccount %}
+
+{% block title %}Continue with Google{% endblock %}
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<main class="container d-flex justify-content-center pt-5" style="min-height: 60vh;">
+  <div class="w-100" style="max-width: 420px;">
+    <h1 class="mb-3 text-center fw-semibold fs-3">{% trans "Continue" %}</h1>
+
+    <p class="text-muted text-center mb-4">
+      {% trans "You are about to sign in using a third-party account." %}
+    </p>
+
+    <form method="post" class="vstack gap-3">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary w-100">
+        {% trans "Continue" %}
+      </button>
+
+      <a class="btn btn-outline-secondary w-100" href="{% url 'account_login' %}">
+        {% trans "Back to login" %}
+      </a>
+    </form>
+  </div>
+</main>
+{% endblock %}

@@ -26,7 +26,8 @@ def user_register(request):
     if request.method == "POST":
         form = UserForm(request.POST)
         if form.is_valid():
-            form.save()
+            user = form.save()
+            login(request,user, backend='django.contrib.auth.backends.ModelBackend')
             return redirect("listing")
     else:
         form = UserForm()

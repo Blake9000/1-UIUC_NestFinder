@@ -38,6 +38,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
     'apartments',
     'subleases',
     'users',
@@ -53,6 +57,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'NestFinder.urls'
@@ -130,9 +135,38 @@ STATICFILES_DIRS = [BASE_DIR / "NestFinder/ui-ux/static"]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+<<<<<<< HEAD
 
 LOGIN_URL = "/login/"        # where to send people if not logged in
 
 
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
+=======
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+ACCOUNT_FORMS = {
+    "login": "users.forms.BootstrapLoginForm",
+    "signup": "users.forms.BootstrapSignupForm",
+}
+LOGIN_REDIRECT_URL = "listing"
+ACCOUNT_LOGOUT_REDIRECT_URL = "listing"
+ACCOUNT_LOGIN_METHODS = {"username", "email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "username*", "password1*", "password2*"]
+
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "SCOPE": [
+            "profile",
+            "email",
+        ],
+        "AUTH_PARAMS": {
+            "access_type": "online",
+        },
+        "OAUTH_PKCE_ENABLED": True,
+    }
+}
+>>>>>>> 713b82ff0aa6e4de760029f88498a5d9532756a2
