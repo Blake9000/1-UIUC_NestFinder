@@ -1,9 +1,10 @@
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
 from django.db.models.aggregates import Count
 from django.db.models.functions import TruncDate
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.views.generic import ListView, DetailView
 from django.shortcuts import render, get_object_or_404
 from django.views import View
@@ -13,6 +14,9 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import matplotlib
 from django.urls import reverse
+
+from users.models import Favorite
+
 
 # Create your views here.
 
@@ -44,10 +48,21 @@ class ListingView(ListView):
         ctx['q']=q
         ctx['total'] = base_qs.count()
         ctx['num_leasing'] = base_qs.values('leasingCompany__name').annotate(total=Count('leasingCompany')).count()
+
+        if self.request.user.is_authenticated:
+            ctx['favorite_ids'] = set(
+                Favorite.objects.filter(
+                    user=self.request.user,
+                    apartment__isnull=False,
+                ).values_list('apartment__id', flat=True)
+            )
+        else:
+            ctx['favorite_ids'] = set()
         return ctx
 
     def post(self, request, *args, **kwargs):
         return self.get(request, *args, **kwargs)
+
 
 
 class FavoritesView(LoginRequiredMixin, ListView):
@@ -277,3 +292,14 @@ def export_apartments_json(request):
 
     # STEP 5: Return response
     return response
+
+
+@login_required
+def toggle_favorite_apartment(request, pk):
+    apartment = get_object_or_404(Apartment, pk=pk)
+    fav = Favorite.objects.filter(user=request.user, apartment=apartment).first()
+    if fav:
+        fav.delete()
+    else:
+        fav = Favorite.objects.create(user=request.user, apartment=apartment)
+    return redirect(request.META.get('HTTP_REFERER'), 'listing')
