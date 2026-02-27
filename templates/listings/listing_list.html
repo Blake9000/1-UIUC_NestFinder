@@ -57,6 +57,24 @@
             {% for listing in listings %}
                 <div class="card mb-3">
                     <div class="card-body">
+                        {% if user.is_authenticated %}
+                        <form method="post"
+                              action="{% url 'toggle_favorite_apartment' listing.pk %}"
+                              class="position-absolute top-0 end-0 m-2">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="btn btn-light border rounded-circle"
+                                    style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+                                {% if listing.pk in favorite_ids %}♥{% else %}♡{% endif %}
+                            </button>
+                        </form>
+                        {% else %}
+                            <a href="{% url 'account_login' %}?next={{ request.path }}"
+                               class="position-absolute top-0 end-0 m-2 btn btn-light border rounded-circle"
+                               style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+                                ♡
+                            </a>
+{% endif %}
                         <h5 class="card-title">{{ listing.name }}</h5>
                         <p class="card-text mb-1">{{ listing.address }}</p>
                         <p class="fw-bold mb-2">${{ listing.price }}</p>
