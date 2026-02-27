@@ -151,6 +151,7 @@ def chart2_view(request):
 
     return render(request, 'vega_lite_charts/chart2.html')
 
+@login_required
 def apartments_count_api(request):
     qs = (
         Apartment.objects
