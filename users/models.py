@@ -14,3 +14,21 @@ class Profile (models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     favorites_apartments = models.ForeignKey(Apartment, on_delete=models.CASCADE, null=True, blank=True)
     favorites_sublease = models.ForeignKey(Sublease, on_delete=models.CASCADE, null=True, blank=True)
+
+
+class Favorite(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites')
+    apartment = models.ForeignKey(Apartment, on_delete=models.CASCADE, null=True, related_name='apartment_favorites')
+    sublease = models.ForeignKey(Sublease, on_delete=models.CASCADE, null=True, related_name='sublease_favorites')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'apartment'],
+                name='unique_user_apartment_favorite',
+            ),
+            models.UniqueConstraint(
+                fields=['user', 'sublease'],
+                name='unique_user_sublease_favorite',
+            )
+        ]

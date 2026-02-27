@@ -129,3 +129,10 @@ STATICFILES_DIRS = [BASE_DIR / "NestFinder/ui-ux/static"]
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+LOGIN_URL = "/login/"        # where to send people if not logged in
+
+
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'

@@ -59,3 +59,4 @@ class ApartmentImages(models.Model):
     apartment = models.ForeignKey(Apartment, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(upload_to=timestamped_image_path)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+

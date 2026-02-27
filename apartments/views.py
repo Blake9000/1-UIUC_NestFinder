@@ -1,3 +1,4 @@
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
 from django.db.models.aggregates import Count
 from django.db.models.functions import TruncDate
@@ -47,6 +48,27 @@ class ListingView(ListView):
 
     def post(self, request, *args, **kwargs):
         return self.get(request, *args, **kwargs)
+
+
+class FavoritesView(LoginRequiredMixin, ListView):
+    context_object_name = 'listings'
+    template_name = 'users/favorites.html'
+
+    def get_queryset(self):
+        q = self.request.GET.get('q') or self.request.POST.get('q')
+        qs = Apartment.objects.filter(
+            apartment_favorites__user=self.request.user
+        )
+
+        if q:
+            qs = qs.filter(
+                Q(name__icontains=q) |
+                Q(address__icontains=q) |
+                Q(floors__icontains=q) |
+                Q(leasingCompany__name__icontains=q) |
+                Q(bedrooms__icontains=q)
+            )
+        return qs
 
 
 class ListingDetailView(View):
