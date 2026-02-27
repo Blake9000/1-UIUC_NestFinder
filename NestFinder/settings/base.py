@@ -135,14 +135,6 @@ STATICFILES_DIRS = [BASE_DIR / "NestFinder/ui-ux/static"]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-<<<<<<< HEAD
-
-LOGIN_URL = "/login/"        # where to send people if not logged in
-
-
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/'
-=======
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
@@ -169,4 +161,3 @@ SOCIALACCOUNT_PROVIDERS = {
         "OAUTH_PKCE_ENABLED": True,
     }
 }
->>>>>>> 713b82ff0aa6e4de760029f88498a5d9532756a2
