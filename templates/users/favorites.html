@@ -54,16 +54,13 @@
                     <div id="vis-container" style="width: 100%; min-height: 350px;"></div>
                 </div>
             </div>
-        </div> </div> <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
-
+        </div> </div>
     <script>
         const spec = {
           "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
           "description": "Total favorites by category",
-          "width": "container",  // Add this line! It stops the chart from squishing
-          "height": 300,         // Set a static height
+          "width": "container",
+          "height": 300,
           "data": {
             "url": "{% url 'favorites_api' %}"
           },
@@ -97,7 +94,6 @@
           }
         };
 
-        // Add {actions: false} to hide the little three-dot menu if you want a cleaner look
         vegaEmbed('#vis-container', spec, {actions: false}).then(function(result) {
             console.log("Chart loaded side-by-side.");
         }).catch(console.error);
