@@ -164,6 +164,7 @@ class GreenStreetPropertiesSpider(scrapy.Spider):
         profile_links = []
 
         for href in hrefs:
+            print(href)
             if not href:
                 continue
             if "/properties/profile/" in href:
