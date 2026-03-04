@@ -26,15 +26,15 @@ The apartment model will hold all the information regarding the apartment offere
 '''
 
 class Apartment(models.Model):
-    price = models.FloatField(null=True, blank=True)
+    price = models.JSONField(default=list, null=True, blank=True)
     name = models.TextField(null=True, blank=True)
     address = models.TextField()
     leasingCompany = models.ForeignKey(LeasingCompany, on_delete=models.CASCADE, null=True, blank=True)
     apartments_images = models.URLField(null=True, blank=True)
     apartments_url = models.URLField(null=True, blank=True)
-    bedrooms = models.IntegerField(null=True, blank=True)
+    bedrooms = models.JSONField(default=list,null=True, blank=True)
     bathrooms = models.IntegerField(null=True, blank=True)
-    sqft_living = models.IntegerField(null=True, blank=True)
+    sqft_living = models.JSONField(default=list,null=True, blank=True)
     floors = models.IntegerField(null=True, blank=True)
     pets = models.BooleanField(null=True, blank=True)
     internet = models.TextField(null=True, blank=True)
