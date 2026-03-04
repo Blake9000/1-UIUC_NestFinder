@@ -7,7 +7,6 @@ urlpatterns = [
      path('favorites/apartment/toggle/<int:pk>/', toggle_favorite_apartment, name='toggle_favorite_apartment'),
      path('detail/<int:pk>/', ListingDetailView.as_view(), name='listing_detail'),
      path('apartments/api/',ApartmentsAPI.as_view(), name='apartments_api'),
-     path('test/chart/', apartment_price_chart_png, name='test_chart'),
      path('apartments/api/pricing', apartment_price_api, name='vega_lite_price_api'),
      path('vega-lite/chart1/', chart1_view, name='vega_lite_chart1'),
      path('vega-lite/chart2/', chart2_view, name='vega_lite_chart2'),

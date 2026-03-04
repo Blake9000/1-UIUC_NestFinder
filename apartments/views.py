@@ -3,18 +3,14 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
 from django.db.models.aggregates import Count
 from django.db.models.functions import TruncDate
-from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render, redirect
-from django.views.generic import ListView, DetailView
+from django.http import HttpResponse
+from django.shortcuts import redirect
+from django.views.generic import ListView
 from django.shortcuts import render, get_object_or_404
 from django.views import View
 from apartments.models import Apartment
-import json
 from io import BytesIO
-import matplotlib.pyplot as plt
-import matplotlib
-from django.urls import reverse
-
+import requests
 from users.models import Favorite
 
 
@@ -117,7 +113,7 @@ class ApartmentsAPI(View):
         return JsonResponse({"ok":True, "data":data})
 
 
-
+'''
 matplotlib.use('Agg')
 def apartment_price_chart_png(request):
     rows = Apartment.objects.all().values('name', 'price', 'sqft_living').order_by('-price')
@@ -137,7 +133,7 @@ def apartment_price_chart_png(request):
     plt.close(fig)
     buf.seek(0)
     return HttpResponse(buf.getvalue(), content_type='image/png')
-
+'''
 # lines 104 - 106 is our public API endpoint
 def apartment_price_api(request):
     q = list(Apartment.objects.all().values('name', 'price', 'sqft_living').order_by('-price'))
@@ -172,7 +168,6 @@ def apartments_count_api(request):
 
     return JsonResponse({"ok": True, "data": data}, safe=False)
 
-import requests
 
 class StreetMap(View):
 
