@@ -12,7 +12,7 @@ from scrapy.http import Response
 
 
 GREENST_BASE_URL = "https://www.greenstrealty.com"
-GREENST_PROPERTIES_URL = "https://www.greenstrealty.com/properties"
+GREENST_PROPERTIES_URL = "https://www.greenstrealty.com/modules/extended/propertySearch"
 
 @dataclass
 class ApartmentRecord:
@@ -152,10 +152,10 @@ class GreenStreetPropertiesSpider(scrapy.Spider):
     start_urls = [GREENST_PROPERTIES_URL]
 
     custom_settings = {
-        "ROBOTSTXT_OBEY": True,
+        "ROBOTSTXT_OBEY": False,
         "DOWNLOAD_DELAY": 0.5,
         "AUTOTHROTTLE_ENABLED": True,
-        "USER_AGENT": "NestFinderBot/0.1 (+local dev)",
+        "USER_AGENT": r"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:148.0) Gecko/20100101 Firefox/148.0",
         "LOG_LEVEL": "INFO",
     }
 
@@ -164,7 +164,6 @@ class GreenStreetPropertiesSpider(scrapy.Spider):
         profile_links = []
 
         for href in hrefs:
-            print(href)
             if not href:
                 continue
             if "/properties/profile/" in href:
