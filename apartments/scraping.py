@@ -4,7 +4,7 @@ import json
 import re
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
-from typing import Iterable, Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple
 
 import scrapy
 from scrapy.crawler import CrawlerProcess
@@ -23,8 +23,10 @@ class ApartmentRecord:
     name: Optional[str] = None
     address: Optional[str] = None
 
-    price_raw: Optional[str] = None
+    prices: Optional[List[float]] = None
+
     availability_raw: Optional[str] = None
+    price_raw: Optional[str] = None
 
     bedrooms: Optional[int] = None
     bathrooms: Optional[float] = None
@@ -46,8 +48,6 @@ class ApartmentRecord:
 
 
 _price_money_re = re.compile(r"\$[\d,]+(?:\.\d+)?")
-_bed_count_re = re.compile(r"\b(\d+)\s*Bed\b", re.IGNORECASE)
-_bath_count_re = re.compile(r"\b(\d+(?:\.\d+)?)\s*Bath\b", re.IGNORECASE)
 
 def absolutize(url: str) -> str:
     if not url:
@@ -95,6 +95,25 @@ def parse_sqft_from_row_text(text: str) -> Optional[int]:
         return None
 
 
+def parse_prices_from_price_raw(price_raw: Optional[str]) -> Optional[List[float]]:
+    if not price_raw:
+        return None
+
+    matches = _price_money_re.findall(price_raw)
+    if not matches:
+        return None
+
+    out: List[float] = []
+    for m in matches:
+        n = m.replace("$", "").replace(",", "")
+        try:
+            out.append(float(n))
+        except ValueError:
+            continue
+
+    return out or None
+
+
 def extract_lightbox_image_urls(response: Response) -> List[str]:
     urls: List[str] = []
 
@@ -123,7 +142,6 @@ def extract_lightbox_image_urls(response: Response) -> List[str]:
 
 
 def extract_property_features(response: Response) -> List[str]:
-    features = response.css(".prop-profile-features .prop-profile-html li *::text").getall()
     joined = []
     for li in response.css(".prop-profile-features .prop-profile-html li"):
         t = clean_text(" ".join(li.css("::text").getall()))
@@ -133,9 +151,7 @@ def extract_property_features(response: Response) -> List[str]:
 
 
 def derive_flags_from_features(features: List[str]) -> Dict[str, Any]:
-    blob = " ".join(f.lower() for f in features)
-
-    out: Dict[str, Any] = {
+    return {
         "pets": None,
         "furnished": None,
         "washer_dryer_in_unit": None,
@@ -143,7 +159,88 @@ def derive_flags_from_features(features: List[str]) -> Dict[str, Any]:
         "internet": None,
     }
 
-    return out
+
+def extract_price_availability_and_stats(response: Response) -> Tuple[
+    Optional[str], Optional[str], Optional[int], Optional[float], Optional[int]
+]:
+    """
+    Robust extraction that does NOT rely on a single row containing both Price + Availability.
+
+    Returns:
+      (price_raw, availability_raw, bedrooms, bathrooms, sqft_living)
+    """
+    price_parts: List[str] = []
+    availability_parts: List[str] = []
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[float] = None
+    sqft: Optional[int] = None
+
+    # Prefer mobile blocks, then fallback to info rows
+    blocks = list(response.css(".prop-profile-mobile-info-data"))
+    if not blocks:
+        blocks = list(response.css(".prop-profile-info-row"))
+
+    for block in blocks:
+        t = clean_text(" ".join(block.css("::text").getall()))
+        if not t:
+            continue
+
+        # pull beds/baths/sqft opportunistically
+        if bedrooms is None or bathrooms is None:
+            b, ba = parse_beds_baths_from_row_text(t)
+            if bedrooms is None and b is not None:
+                bedrooms = b
+            if bathrooms is None and ba is not None:
+                bathrooms = ba
+
+        if sqft is None:
+            s = parse_sqft_from_row_text(t)
+            if s is not None:
+                sqft = s
+
+        # capture price / availability
+        m = re.search(r"Price\s*:\s*(.+?)(?:Availability\s*:|$)", t, flags=re.IGNORECASE)
+        if m:
+            pr = clean_text(m.group(1))
+            if pr:
+                price_parts.append(pr)
+
+        m = re.search(r"Availability\s*:\s*(.+)$", t, flags=re.IGNORECASE)
+        if m:
+            av = clean_text(m.group(1))
+            if av:
+                availability_parts.append(av)
+
+    # Fallback: regex over the raw HTML if CSS text extraction misses it
+    if not price_parts:
+        for m in re.finditer(r"Price\s*:\s*([^<\r\n]+)", response.text, flags=re.IGNORECASE):
+            pr = clean_text(m.group(1))
+            if pr:
+                price_parts.append(pr)
+
+    if not availability_parts:
+        for m in re.finditer(r"Availability\s*:\s*([^<\r\n]+)", response.text, flags=re.IGNORECASE):
+            av = clean_text(m.group(1))
+            if av:
+                availability_parts.append(av)
+
+    # Deduplicate while preserving order
+    def dedupe_keep_order(vals: List[str]) -> List[str]:
+        seen = set()
+        out = []
+        for v in vals:
+            if v not in seen:
+                seen.add(v)
+                out.append(v)
+        return out
+
+    price_parts = dedupe_keep_order(price_parts)
+    availability_parts = dedupe_keep_order(availability_parts)
+
+    price_raw = " | ".join(price_parts) if price_parts else None
+    availability_raw = " | ".join(availability_parts) if availability_parts else None
+
+    return price_raw, availability_raw, bedrooms, bathrooms, sqft
 
 
 class GreenStreetPropertiesSpider(scrapy.Spider):
@@ -176,7 +273,6 @@ class GreenStreetPropertiesSpider(scrapy.Spider):
             seen.add(url)
             yield response.follow(url, callback=self.parse_property)
 
-
     def parse_property(self, response: Response):
         now = datetime.now(timezone.utc)
 
@@ -189,43 +285,14 @@ class GreenStreetPropertiesSpider(scrapy.Spider):
         image_urls = extract_lightbox_image_urls(response)
         primary_image = image_urls[0] if image_urls else None
 
-        info_texts: List[str] = []
-        for row in response.css(".prop-profile-info-row"):
-            t = clean_text(" ".join(row.css("::text").getall()))
-            if t:
-                info_texts.append(t)
-
-        for row in response.css(".prop-profile-mobile-info-data"):
-            t = clean_text(" ".join(row.css("::text").getall()))
-            if t:
-                info_texts.append(t)
-
-        best_row = None
-        for t in info_texts:
-            if "Price" in t and "Availability" in t:
-                best_row = t
-                break
-
-        bedrooms = None
-        bathrooms = None
-        sqft = None
-        price_raw = None
-        availability_raw = None
-
-        if best_row:
-            bedrooms, bathrooms = parse_beds_baths_from_row_text(best_row)
-            sqft = parse_sqft_from_row_text(best_row)
-
-            m = re.search(r"Price\s*:\s*(.+?)(?:Availability\s*:|$)", best_row, flags=re.IGNORECASE)
-            if m:
-                price_raw = clean_text(m.group(1))
-
-            m = re.search(r"Availability\s*:\s*(.+)$", best_row, flags=re.IGNORECASE)
-            if m:
-                availability_raw = clean_text(m.group(1))
+        # IMPLEMENTED: robust extraction
+        price_raw, availability_raw, bedrooms, bathrooms, sqft = extract_price_availability_and_stats(response)
+        prices = parse_prices_from_price_raw(price_raw)
 
         features = extract_property_features(response)
         flags = derive_flags_from_features(features)
+
+        additional = {"features": features} if features else None
 
         record = ApartmentRecord(
             leasing_company_name="Green Street Realty",
@@ -233,6 +300,7 @@ class GreenStreetPropertiesSpider(scrapy.Spider):
             apartments_url=response.url,
             name=title,
             address=address,
+            prices=prices,
             price_raw=price_raw,
             availability_raw=availability_raw,
             bedrooms=bedrooms,
@@ -240,7 +308,7 @@ class GreenStreetPropertiesSpider(scrapy.Spider):
             sqft_living=sqft,
             apartments_images=primary_image,
             image_urls=image_urls or None,
-            additional_amenities={"features": features} if features else None,
+            additional_amenities=additional,
             date_scraped=now,
             pets=flags["pets"],
             furnished=flags["furnished"],

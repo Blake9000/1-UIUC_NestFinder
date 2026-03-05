@@ -4,7 +4,7 @@ from .models import Apartment, LeasingCompany, ApartmentImages
 
 @admin.register(Apartment)
 class ApartmentAdmin(admin.ModelAdmin):
-    list_display = ("price","address")
+    list_display = ("prices","address")
 
 @admin.register(LeasingCompany)
 class LeasingCompanyAdmin(admin.ModelAdmin):

@@ -1,82 +1,116 @@
 {% extends "base.html" %}
 
 {% block title %}
-    Listings
+  Listings
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid mt-4">
 
-    <div class="row mb-4">
-        <form method="get" class="col-md-6">
-            <div class="input-group">
-                <input
-                    type="search"
-                    name="q"
-                    class="form-control"
-                    placeholder="Search with get"
-                    value="{% if q %}{{ q }}{% endif %}"
-                >
-                <button
-                    type="submit"
-                    class="btn btn-primary"
-                >
-                    Search
+  <div class="row mb-4">
+    <form method="get" class="col-md-6">
+      <div class="input-group">
+        <input
+          type="search"
+          name="q"
+          class="form-control"
+          placeholder="Search"
+          value="{% if q %}{{ q }}{% endif %}"
+        >
+        <button type="submit" class="btn btn-primary">Search</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="row">
+    <div class="col-md-4" style="max-height: 80vh; overflow-y: auto;">
+      <h4 class="mb-3">Listings {% if total %} ({{ total }}){% endif %}</h4>
+      <p>Total Leasing Companies: {{ num_leasing }}</p>
+
+      {% for listing in listings %}
+        <div class="card mb-3 position-relative">
+          <div class="card-body">
+
+            {% if user.is_authenticated %}
+              <form method="post"
+                    action="{% url 'toggle_favorite_apartment' listing.pk %}"
+                    class="position-absolute top-0 end-0 m-2">
+                {% csrf_token %}
+                <button type="submit"
+                        class="btn btn-light border rounded-circle"
+                        style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+                  {% if listing.pk in favorite_ids %}♥{% else %}♡{% endif %}
                 </button>
-            </div>
-        </form>
-    </div>
+              </form>
+            {% else %}
+              <a href="{% url 'account_login' %}?next={{ request.path }}"
+                 class="position-absolute top-0 end-0 m-2 btn btn-light border rounded-circle"
+                 style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+                ♡
+              </a>
+            {% endif %}
 
-    <div class="row">
+            <div class="d-flex gap-3">
+              {% if listing.apartments_images %}
+                <img
+                  src="{{ listing.apartments_images }}"
+                  alt="Listing image"
+                  class="rounded border"
+                  style="width:84px;height:84px;object-fit:cover;"
+                >
+              {% endif %}
 
-        <div class="col-md-4" style="max-height: 80vh; overflow-y: auto;">
-            <h4 class="mb-3">Listings {% if total %} ({{ total }}){% endif %}</h4>
-            <p>Total Leasing Companies: {{ num_leasing }}</p>
+              <div class="flex-grow-1">
+                <h5 class="card-title mb-1">{{ listing.name }}</h5>
+                <div class="text-muted small mb-2">{{ listing.address }}</div>
 
-            {% for listing in listings %}
-                <div class="card mb-3">
-                    <div class="card-body">
-                        {% if user.is_authenticated %}
-                        <form method="post"
-                              action="{% url 'toggle_favorite_apartment' listing.pk %}"
-                              class="position-absolute top-0 end-0 m-2">
-                            {% csrf_token %}
-                            <button type="submit"
-                                    class="btn btn-light border rounded-circle"
-                                    style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
-                                {% if listing.pk in favorite_ids %}♥{% else %}♡{% endif %}
-                            </button>
-                        </form>
-                        {% else %}
-                            <a href="{% url 'account_login' %}?next={{ request.path }}"
-                               class="position-absolute top-0 end-0 m-2 btn btn-light border rounded-circle"
-                               style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
-                                ♡
-                            </a>
-                        {% endif %}
-                        <h5 class="card-title">{{ listing.name }}</h5>
-                        <p class="card-text mb-1">{{ listing.address }}</p>
-                        <p class="fw-bold mb-2">${{ listing.price }}</p>
-
-                        <a href="{{ listing.get_absolute_url }}"
-                           class="btn btn-primary btn-sm">
-                            View Details
-                        </a>
-                    </div>
+                {# price now prices (list) #}
+                <div class="fw-bold mb-2">
+                  {% if listing.prices and listing.prices|length %}
+                    {% if listing.prices|length == 1 %}
+                      ${{ listing.prices.0|floatformat:0 }}
+                    {% else %}
+                      ${{ listing.prices|first|floatformat:0 }} - ${{ listing.prices|last|floatformat:0 }}
+                    {% endif %}
+                  {% elif listing.additional_amenities.price_raw %}
+                    {{ listing.additional_amenities.price_raw }}
+                  {% else %}
+                    <span class="text-muted fw-normal">Price unknown</span>
+                  {% endif %}
                 </div>
-            {% empty %}
-                <p>No listings found. Try adjusting your filter.</p>
-            {% endfor %}
+
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                  {% if listing.bedrooms is not None %}
+                    <span class="badge text-bg-secondary">{{ listing.bedrooms }} bd</span>
+                  {% endif %}
+                  {% if listing.bathrooms is not None %}
+                    <span class="badge text-bg-secondary">{{ listing.bathrooms }} ba</span>
+                  {% endif %}
+                  {% if listing.sqft_living %}
+                    <span class="badge text-bg-secondary">{{ listing.sqft_living }} sqft</span>
+                  {% endif %}
+                </div>
+
+                <a href="{{ listing.get_absolute_url }}" class="btn btn-primary btn-sm">
+                  View Details
+                </a>
+              </div>
+            </div>
+
+          </div>
         </div>
-
-            <div class="col-md-8">
-                <div class="border rounded d-flex align-items-center justify-content-center overflow-hidden"
-                     style="height: 80vh; background-color: #f8f9fa;">
-
-                    Map goes here
-
-                </div>
-            </div>
+      {% empty %}
+        <p>No listings found. Try adjusting your filter.</p>
+      {% endfor %}
     </div>
+
+    <div class="col-md-8">
+      <div class="border rounded d-flex align-items-center justify-content-center overflow-hidden"
+           style="height: 80vh; background-color: #f8f9fa;">
+        Map goes here
+      </div>
+    </div>
+
+  </div>
 </div>
 {% endblock %}

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}
-  Listing Detail for {{ listing.name}}
+  Listing Detail for {{ listing.name }}
 {% endblock %}
 
 {% block content %}
@@ -12,17 +12,27 @@
 
       <div class="d-flex justify-content-between align-items-start gap-3">
         <div>
-          <h1 class="h4 mb-1">
-            {{ listing.name }}
-          </h1>
+          <h1 class="h4 mb-1">{{ listing.name }}</h1>
           <div class="text-muted">{{ listing.address }}</div>
         </div>
-
-        {% if listing.price %}
+        {% if listing.prices and listing.prices|length %}
           <div class="text-end">
             <div class="fs-5 fw-semibold">
-              ${{ listing.price}}
+              {% if listing.prices|length == 1 %}
+                ${{ listing.prices.0|floatformat:0 }}
+              {% else %}
+                ${{ listing.prices|first|floatformat:0 }} - ${{ listing.prices|last|floatformat:0 }}
+              {% endif %}
             </div>
+            <div class="text-muted small">per month</div>
+
+            {% if listing.additional_amenities.price_raw %}
+              <div class="text-muted small">{{ listing.additional_amenities.price_raw }}</div>
+            {% endif %}
+          </div>
+        {% elif listing.additional_amenities.price_raw %}
+          <div class="text-end">
+            <div class="fs-5 fw-semibold">{{ listing.additional_amenities.price_raw }}</div>
             <div class="text-muted small">per month</div>
           </div>
         {% endif %}
@@ -32,19 +42,13 @@
 
       <div class="d-flex flex-wrap gap-2 mb-3">
         {% if listing.bedrooms is not None %}
-          <span class="badge text-bg-secondary">
-            {{ listing.bedrooms }} bd
-          </span>
+          <span class="badge text-bg-secondary">{{ listing.bedrooms }} bd</span>
         {% endif %}
         {% if listing.bathrooms is not None %}
-          <span class="badge text-bg-secondary">
-            {{ listing.bathrooms }} ba
-          </span>
+          <span class="badge text-bg-secondary">{{ listing.bathrooms }} ba</span>
         {% endif %}
         {% if listing.sqft_living %}
-          <span class="badge text-bg-secondary">
-            {{ listing.sqft_living }} sqft
-          </span>
+          <span class="badge text-bg-secondary">{{ listing.sqft_living }} sqft</span>
         {% endif %}
         {% if listing.floors %}
           <span class="badge text-bg-secondary">
@@ -52,8 +56,12 @@
           </span>
         {% endif %}
         {% if listing.housing_type %}
-          <span class="badge text-bg-secondary">
-            {{ listing.housing_type }}
+          <span class="badge text-bg-secondary">{{ listing.housing_type }}</span>
+        {% endif %}
+
+        {% if listing.additional_amenities.availability_raw %}
+          <span class="badge text-bg-info">
+            Availability: {{ listing.additional_amenities.availability_raw }}
           </span>
         {% endif %}
       </div>
@@ -82,7 +90,7 @@
         <div class="col-md-4">
           <div class="small text-muted">Internet</div>
           <div>
-            {{ listing.internet}}
+            {% if listing.internet %}{{ listing.internet }}{% else %}<span class="text-muted">Unknown</span>{% endif %}
           </div>
         </div>
 
@@ -107,25 +115,45 @@
         </div>
       </div>
 
+      {% if listing.apartments_images or listing.additional_amenities.image_urls %}
+        <hr>
+        <h2 class="h6">Images</h2>
+
+        <div class="row g-2">
+          {% if listing.apartments_images %}
+            <div class="col-6 col-md-4 col-lg-3">
+              <a href="{{ listing.apartments_images }}" target="_blank" rel="noopener">
+                <img src="{{ listing.apartments_images }}" class="img-fluid rounded border" alt="Apartment image">
+              </a>
+            </div>
+          {% endif %}
+
+          {% if listing.additional_amenities.image_urls %}
+            {% for u in listing.additional_amenities.image_urls %}
+              {% if u != listing.apartments_images %}
+                <div class="col-6 col-md-4 col-lg-3">
+                  <a href="{{ u }}" target="_blank" rel="noopener">
+                    <img src="{{ u }}" class="img-fluid rounded border" alt="Apartment image">
+                  </a>
+                </div>
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        </div>
+      {% endif %}
+
       {% if listing.additional_amenities %}
         <hr>
         <h2 class="h6">Additional amenities</h2>
 
-        {% if listing.additional_amenities.items %}
-          <dl class="row mb-0">
-            {% for key, value in listing.additional_amenities.items %}
-              <dt class="col-sm-4 col-lg-3 text-muted">{{ key }}</dt>
-              <dd class="col-sm-8 col-lg-9">
-                {% if value is True %}Yes
-                {% elif value is False %}No
-                {% elif value is None %}<span class="text-muted">Unknown</span>
-                {% else %}{{ value }}
-                {% endif %}
-              </dd>
+        {% if listing.additional_amenities.features %}
+          <ul class="mb-0">
+            {% for feat in listing.additional_amenities.features %}
+              <li>{{ feat }}</li>
             {% endfor %}
-          </dl>
+          </ul>
         {% else %}
-          <pre class="mb-0">{{ listing.additional_amenities}}</pre>
+          <pre class="mb-0">{{ listing.additional_amenities }}</pre>
         {% endif %}
       {% endif %}
 
@@ -135,42 +163,32 @@
         {% if listing.leasingCompany %}
           <div>
             Leasing company:
-            <strong>{{ listing.leasingCompany.name}}</strong>
+            <strong>{{ listing.leasingCompany.name }}</strong>
           </div>
         {% endif %}
 
         {% if listing.date_posted %}
-          <div>Posted: {{ listing.date_posted}}</div>
+          <div>Posted: {{ listing.date_posted }}</div>
         {% endif %}
-
         {% if listing.date_scraped %}
-          <div>Scraped: {{ listing.date_scraped}}</div>
+          <div>Scraped: {{ listing.date_scraped }}</div>
         {% endif %}
       </div>
 
       <div class="mt-3 d-flex gap-2">
         {% if listing.apartments_url %}
-          <a
-            href="{{ listing.apartments_url }}"
-            target="_blank"
-            rel="noopener"
-            class="btn btn-primary"
-          >
+          <a href="{{ listing.apartments_url }}" target="_blank" rel="noopener" class="btn btn-primary">
             View listing
           </a>
         {% endif %}
 
         {% if listing.leasingCompany and listing.leasingCompany.url %}
-          <a
-            href="{{ listing.leasingCompany.url }}"
-            target="_blank"
-            rel="noopener"
-            class="btn btn-outline-secondary"
-          >
+          <a href="{{ listing.leasingCompany.url }}" target="_blank" rel="noopener" class="btn btn-outline-secondary">
             Leasing company site
           </a>
         {% endif %}
       </div>
+
     </div>
   </div>
 
