@@ -102,3 +102,7 @@ while still maintaining a strong first response.
 Limiting the API usage can reduce token consumption and avoid hitting our free-tier or even paid API limits. At the same
  time, the local model absorbs the majority of the user interactions, allowing GPU resources to be used more
  predictably and efficiently.
+
+ 4. In general, using the self-hosting pre-trained model is more acceptable when the usage is high enough to justify the
+ cost spent on maintaining the server. On the other hand, it would be better to use a paid API when the usage is not high
+ or inconsistent because paid APIs usually charge based on the number of requests.
