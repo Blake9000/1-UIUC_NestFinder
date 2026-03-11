@@ -117,7 +117,7 @@ def generate_llama_response(prompt: str, max_new_tokens=48) -> str:
 
 
 def rank_apartments_with_llama(user_query: str, apartments: list[dict]) -> list[int]:
-    compact_apartments = apartments[:10]
+    compact_apartments = apartments
     prompt = build_ranking_prompt(user_query, compact_apartments)
     raw_response = generate_llama_response(prompt, max_new_tokens=48)
     return extract_top_ids(raw_response, compact_apartments)
