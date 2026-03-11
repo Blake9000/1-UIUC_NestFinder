@@ -320,14 +320,183 @@ def apartments_favorite_api(request):
 # Ai_llama integration, it's the hugging face model we picked.
 from django.shortcuts import render
 from django.http import JsonResponse
-from .ai_llama import generate_llama_response
+from .ai_llama import *
 
 def apartment_chatbot(request):
     if request.method == "GET":
         return render(request, "chatbot/chatbot.html")
 
-    user_message = request.POST.get("message", "")
-    bot_reply = generate_llama_response(user_message)
+    user_message = request.POST.get("message", "").strip()
+    mode = request.POST.get("mode", "local").strip().lower()
 
-    return JsonResponse({"reply": bot_reply})
+    if not user_message:
+        return JsonResponse({"error": "Message is required."}, status=400)
 
+    apartments = list(
+        Apartment.objects.select_related("leasingCompany").all()[:75]
+    )
+
+    if not apartments:
+        return JsonResponse({"results": []})
+
+    apartment_payload = [serialize_apartment_for_model(apartment) for apartment in apartments]
+
+    try:
+        if mode == "api":
+            """placeholder"""
+            # top_ids = rank_apartments_with_api(user_message, apartment_payload)
+        else:
+            top_ids = rank_apartments_with_llama(user_message, apartment_payload)
+
+        apartment_map = {apartment.id: apartment for apartment in apartments}
+
+        ranked_apartments = []
+        for apartment_id in top_ids:
+            apartment = apartment_map.get(apartment_id)
+            if apartment and apartment not in ranked_apartments:
+                ranked_apartments.append(apartment)
+
+        results = [serialize_apartment_for_frontend(apartment) for apartment in ranked_apartments[:3]]
+
+        return JsonResponse({"results": results})
+
+    except Exception as exc:
+        return JsonResponse({"error": str(exc)}, status=500)
+
+
+def serialize_apartment_for_model(apartment):
+    prices = normalize_prices(apartment.prices)
+    additional_amenities = apartment.additional_amenities or {}
+
+    leasing_company_name = None
+    if apartment.leasingCompany:
+        leasing_company_name = str(apartment.leasingCompany)
+
+    return {
+        "id": apartment.id,
+        "name": apartment.name or "",
+        "address": apartment.address or "",
+        "leasing_company": leasing_company_name,
+        "prices": prices,
+        "price_min": min(prices) if prices else None,
+        "price_max": max(prices) if prices else None,
+        "bedrooms": apartment.bedrooms,
+        "bathrooms": apartment.bathrooms,
+        "sqft_living": apartment.sqft_living,
+        "floors": apartment.floors,
+        "pets": apartment.pets,
+        "internet": apartment.internet,
+        "washer_dryer_in_unit": apartment.washer_dryer_in_unit,
+        "washer_dryer_out_unit": apartment.washer_dryer_out_unit,
+        "furnished": apartment.furnished,
+        "housing_type": apartment.housing_type,
+        "apartments_url": apartment.apartments_url,
+        "apartments_images": apartment.apartments_images,
+        "date_posted": apartment.date_posted.isoformat() if apartment.date_posted else None,
+        "date_scraped": apartment.date_scraped.isoformat() if apartment.date_scraped else None,
+        "additional_amenities": additional_amenities,
+        "amenities_text": flatten_additional_amenities(additional_amenities),
+    }
+
+
+def serialize_apartment_for_frontend(apartment):
+    prices = normalize_prices(apartment.prices)
+    price_display = format_price_display(prices)
+
+    amenities = []
+
+    if apartment.pets is True:
+        amenities.append("Pets allowed")
+    elif apartment.pets is False:
+        amenities.append("No pets")
+
+    if apartment.furnished is True:
+        amenities.append("Furnished")
+
+    if apartment.washer_dryer_in_unit is True:
+        amenities.append("In-unit washer/dryer")
+    elif apartment.washer_dryer_out_unit is True:
+        amenities.append("Shared washer/dryer")
+
+    if apartment.internet:
+        amenities.append(str(apartment.internet))
+
+    if apartment.housing_type:
+        amenities.append(str(apartment.housing_type))
+
+    if apartment.leasingCompany:
+        amenities.append(f"Leasing: {apartment.leasingCompany}")
+
+    return {
+        "id": apartment.id,
+        "name": apartment.name or "Unnamed listing",
+        "address": apartment.address or "Address unavailable",
+        "image": apartment.apartments_images,
+        "price_display": price_display,
+        "bedrooms": apartment.bedrooms,
+        "bathrooms": apartment.bathrooms,
+        "sqft_living": apartment.sqft_living,
+        "detail_url": apartment.get_absolute_url(),
+        "amenities": amenities[:5],
+    }
+
+
+def normalize_prices(prices):
+    if not prices:
+        return []
+
+    if isinstance(prices, str):
+        try:
+            prices = json.loads(prices)
+        except Exception:
+            return []
+
+    if not isinstance(prices, list):
+        return []
+
+    normalized = []
+    for value in prices:
+        try:
+            normalized.append(float(value))
+        except (TypeError, ValueError):
+            continue
+
+    return sorted(normalized)
+
+
+def format_price_display(prices):
+    if not prices:
+        return "Price unknown"
+    if len(prices) == 1:
+        return f"${prices[0]:.0f}"
+    return f"${prices[0]:.0f} - ${prices[-1]:.0f}"
+
+
+def flatten_additional_amenities(data):
+    if not data:
+        return ""
+
+    parts = []
+
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if value in [None, "", [], {}]:
+                continue
+
+            pretty_key = str(key).replace("_", " ").strip()
+
+            if isinstance(value, list):
+                value_text = ", ".join(str(v) for v in value if v not in [None, ""])
+            elif isinstance(value, dict):
+                nested_items = []
+                for nested_key, nested_value in value.items():
+                    if nested_value not in [None, "", [], {}]:
+                        nested_items.append(f"{nested_key}: {nested_value}")
+                value_text = ", ".join(nested_items)
+            else:
+                value_text = str(value)
+
+            if value_text:
+                parts.append(f"{pretty_key}: {value_text}")
+
+    return " | ".join(parts)

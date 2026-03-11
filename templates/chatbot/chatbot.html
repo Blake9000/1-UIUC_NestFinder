@@ -75,7 +75,6 @@
 document.getElementById("apartment-search-form").addEventListener("submit", async function(e) {
     e.preventDefault();
 
-    const form = document.getElementById("apartment-search-form");
     const input = document.getElementById("message-input");
     const mode = document.getElementById("mode-select");
     const button = document.getElementById("search-button");
@@ -166,6 +165,10 @@ document.getElementById("apartment-search-form").addEventListener("submit", asyn
                 ? `<span class="badge text-bg-secondary">${apartment.sqft_living} sqft</span>`
                 : "";
 
+            const amenityBadges = (apartment.amenities || []).map(amenity =>
+                `<span class="badge text-bg-light border">${amenity}</span>`
+            ).join("");
+
             return `
               <div class="card mb-3 position-relative">
                 <div class="card-body">
@@ -188,6 +191,10 @@ document.getElementById("apartment-search-form").addEventListener("submit", asyn
                         ${bedroomBadge}
                         ${bathroomBadge}
                         ${sqftBadge}
+                      </div>
+
+                      <div class="d-flex flex-wrap gap-2 mb-3">
+                        ${amenityBadges}
                       </div>
 
                       <a href="${apartment.detail_url}" class="btn btn-primary btn-sm">
