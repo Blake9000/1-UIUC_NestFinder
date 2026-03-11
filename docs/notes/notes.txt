@@ -92,4 +92,13 @@ However, with the local Hugging Face model integrated into Django, it does not h
 but is limited by available compute resources. At this scale, a local model would require sustained GPU usage and careful
 request handling to avoid slow response times.
 
-3.
+3. In our design, or in a future application, we can make it where users can make an initial request using the external API
+(Gemini) to obtain high-quality response for complex or open-ended queries. After this initial interaction,
+subsequent prompts are handled by the local Hugging Face model, which is better suited for follow up questions
+and simpler conversational tasks. It's similar to ChatGPT, where it allows free users to use their higher end models, but
+after a couple queries it lowers the model version. This approach reduces repeated API calls
+while still maintaining a strong first response.
+
+Limiting the API usage can reduce token consumption and avoid hitting our free-tier or even paid API limits. At the same
+ time, the local model absorbs the majority of the user interactions, allowing GPU resources to be used more
+ predictably and efficiently.
