@@ -56,3 +56,40 @@ The vega-lite charts are accessible through:
 /vega-lite/chart2
 Chart 1 is embedded in the Listing page.
 Chart 2 is embedded in the about page.
+
+
+A6:
+
+1. We evaluated our 15 language models from the Hugging Face Open LL Leaderboard across
+five size categories, primarily focusing on speed, model size, and the quality of responses
+for simple conversational and informational queries related to our apartment web app
+
+Below is our observations:
+
+Model Size | Speed | Response quality | Observations
+  <1B (extra small)    | very fast  |  very poor | responses were often irrelevant or refused to answer
+  1B-3B (small)  | Fast  | Poor-Fair  | slight improvement, but still unreliable
+  3B-7B (medium)  | Moderate | Mixed | some useful responses, but inconsistent
+  7B-10B (large) | Acceptable | Generally good | Best balance of speed and quality so far
+  >10B (extra-large)   | Very Slow | Mixed | Very long runtimes with little quality gain
+
+Our sweet spot would be between 7B-10B parameter range. It had the best balance between response quality
+and runtime performance. The responses were coherent and relevant to the questions asked.
+
+Larger models greater than 10B parameter range did not significantly outperform the 7B-10B range.
+It took way too long for one response to generate and could not be processed by many of our machines.
+
+The cost implications for most of these models would be low to moderate, it's not until
+you reach 7B-10B parameter range where it requires more power like a powerful GPU. any model above
+10B would be very high end, thus we believe 7B-10B is best to run for the average machine.
+
+2. If our application scaled to 10,000 daily users, we would not be able to rely on Gemini's free-tier
+API alone. While the free tier is useful for development and low traffic, it enforces strict daily request and
+rate limits. Even if each user sent only one message per day, the total number of requests would quickly exceed
+the free-tier quota, resulting in rate-limit errors and failed responses during peak usage hours.
+
+However, with the local Hugging Face model integrated into Django, it does not have a request or any token quotas,
+but is limited by available compute resources. At this scale, a local model would require sustained GPU usage and careful
+request handling to avoid slow response times.
+
+3.
