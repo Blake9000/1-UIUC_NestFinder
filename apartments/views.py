@@ -316,3 +316,18 @@ def apartments_favorite_api(request):
     ]
 
     return JsonResponse(data, safe=False)
+
+# Ai_llama integration, it's the hugging face model we picked.
+from django.shortcuts import render
+from django.http import JsonResponse
+from .ai_llama import generate_llama_response
+
+def apartment_chatbot(request):
+    if request.method == "GET":
+        return render(request, "chatbot/chatbot.html")
+
+    user_message = request.POST.get("message", "")
+    bot_reply = generate_llama_response(user_message)
+
+    return JsonResponse({"reply": bot_reply})
+
