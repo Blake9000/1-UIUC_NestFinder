@@ -333,7 +333,7 @@ def apartment_chatbot(request):
         return JsonResponse({"error": "Message is required."}, status=400)
 
     apartments = list(
-        Apartment.objects.select_related("leasingCompany").all()[:75]
+        Apartment.objects.select_related("leasingCompany").all()
     )
 
     if not apartments:
@@ -343,8 +343,7 @@ def apartment_chatbot(request):
 
     try:
         if mode == "api":
-            """placeholder"""
-            # top_ids = rank_apartments_with_api(user_message, apartment_payload)
+            top_ids = geminiAPI(user_message, apartment_payload)
         else:
             top_ids = rank_apartments_with_llama(user_message, apartment_payload)
 
@@ -362,6 +361,148 @@ def apartment_chatbot(request):
 
     except Exception as exc:
         return JsonResponse({"error": str(exc)}, status=500)
+
+from google import genai
+from NestFinder.secrets_environment import env
+from google.genai import types
+
+MODEL_NAME = "gemini-3.1-flash-lite-preview"
+
+def geminiAPI(message: str, apartments: list[dict]) -> list[int]:
+    client = genai.Client(api_key=env("GEMINI_API_KEY"))
+
+    prompt = build_gemini_ranking_prompt(message, apartments)
+
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            temperature=0,
+            max_output_tokens=64,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            response_mime_type="application/json",
+            response_schema={
+                "type": "object",
+                "properties": {
+                    "top_3": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "minItems": 3,
+                        "maxItems": 3,
+                    }
+                },
+                "required": ["top_3"],
+            },
+        ),
+    )
+
+    raw_text = extract_response_text(response)
+    return extract_top_ids(raw_text, apartments)
+
+
+def build_gemini_ranking_prompt(user_query: str, apartments: list[dict]) -> str:
+    apartment_lines = []
+
+    for apartment in apartments:
+        compact = {
+            "id": apartment.get("id"),
+            "name": apartment.get("name"),
+            "address": apartment.get("address"),
+            "price_min": apartment.get("price_min"),
+            "price_max": apartment.get("price_max"),
+            "bedrooms": apartment.get("bedrooms"),
+            "bathrooms": apartment.get("bathrooms"),
+            "sqft_living": apartment.get("sqft_living"),
+            "pets": apartment.get("pets"),
+            "furnished": apartment.get("furnished"),
+            "washer_dryer_in_unit": apartment.get("washer_dryer_in_unit"),
+            "washer_dryer_out_unit": apartment.get("washer_dryer_out_unit"),
+            "housing_type": apartment.get("housing_type"),
+            "internet": apartment.get("internet"),
+            "leasing_company": apartment.get("leasing_company"),
+            "amenities_text": apartment.get("amenities_text"),
+        }
+        apartment_lines.append(json.dumps(compact, ensure_ascii=False))
+
+    apartment_block = "\n".join(apartment_lines)
+
+    return f"""
+    Rank the apartments for this request.
+
+    User request:
+    {user_query}
+
+    Apartments:
+    {apartment_block}
+
+    Return only JSON:
+    {{"top_3":[id1,id2,id3]}}
+
+    Rules:
+    - Exactly 3 IDs
+    - Best to worst
+    - Only use listed IDs
+    - No explanation
+    """.strip()
+
+
+def extract_response_text(response) -> str:
+    if hasattr(response, "text") and response.text:
+        return response.text.strip()
+
+    try:
+        parts = response.candidates[0].content.parts
+        text_chunks = [part.text for part in parts if hasattr(part, "text") and part.text]
+        return "\n".join(text_chunks).strip()
+    except Exception:
+        return ""
+
+
+def extract_top_ids(raw_response: str, apartments: list[dict]) -> list[int]:
+    valid_ids = {apartment["id"] for apartment in apartments if apartment.get("id") is not None}
+
+    try:
+        parsed = json.loads(raw_response)
+        values = parsed.get("top_3", [])
+        cleaned = []
+
+        for value in values:
+            if isinstance(value, int) and value in valid_ids and value not in cleaned:
+                cleaned.append(value)
+
+        if len(cleaned) >= 3:
+            return cleaned[:3]
+    except Exception:
+        pass
+
+    try:
+        json_match = re.search(r"\{.*\}", raw_response, re.DOTALL)
+        if json_match:
+            parsed = json.loads(json_match.group(0))
+            values = parsed.get("top_3", [])
+            cleaned = []
+
+            for value in values:
+                if isinstance(value, int) and value in valid_ids and value not in cleaned:
+                    cleaned.append(value)
+
+            if len(cleaned) >= 3:
+                return cleaned[:3]
+    except Exception:
+        pass
+
+    numbers = re.findall(r"\d+", raw_response or "")
+    cleaned = []
+
+    for num in numbers:
+        apartment_id = int(num)
+        if apartment_id in valid_ids and apartment_id not in cleaned:
+            cleaned.append(apartment_id)
+
+    if len(cleaned) >= 3:
+        return cleaned[:3]
+
+    return [apartment["id"] for apartment in apartments[:3] if apartment.get("id") is not None]
 
 
 def serialize_apartment_for_model(apartment):
