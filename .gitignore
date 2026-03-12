@@ -62,3 +62,10 @@ htmlcov/
 node_modules/
 dist/
 build/
+
+# ================================
+# Model Weights
+# ================================
+*.bin
+*.safetensors
+*.pt
