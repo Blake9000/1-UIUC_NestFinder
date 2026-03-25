@@ -1,8 +1,4 @@
-# Paste in and as: illinois/settings/production.py
-# We will first import everything from base.py (our new settings.py file that we renamed to base.py)
-#==================================================================================
 from django.conf import STATICFILES_STORAGE_ALIAS
-
 from .base import *
 
 DEBUG = False
@@ -11,7 +7,7 @@ STATIC_ROOT = BASE_DIR / 'static'
 STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
 
 # Replace it with your name:
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'https://bmackin2.pythonanywhere.com','bmackin2.pythonanywhere.com', 'nestfinder.blake4it.com']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1','bmackin2.pythonanywhere.com', 'nestfinder.blake4it.com']
 
 CSRF_TRUSTED_ORIGINS = ["https://nestfinder.blake4it.com"]
 
