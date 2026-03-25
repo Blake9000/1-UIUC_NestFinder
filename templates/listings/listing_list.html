@@ -1,116 +1,496 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}
-  Listings
+{% block title %}Listings{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
+<style>
+  .listings-page {
+    font-family: 'DM Sans', sans-serif;
+    background: #f8f7f4;
+    height: calc(100vh - 56px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Top bar ── */
+  .listings-topbar {
+    background: #fff;
+    border-bottom: 1px solid #e8e6e0;
+    padding: 0.75rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .search-form { flex: 1; min-width: 180px; max-width: 400px; }
+  .search-input-wrap { display: flex; border: 1px solid #d4d0c9; border-radius: 8px; overflow: hidden; background: #fff; }
+  .search-input-wrap input {
+    flex: 1; border: none; outline: none;
+    padding: 8px 13px; font-size: 0.875rem;
+    font-family: 'DM Sans', sans-serif; background: transparent; color: #1a1917;
+  }
+  .search-input-wrap input::placeholder { color: #b8b5ae; }
+  .search-input-wrap button {
+    border: none; background: #1a1917; color: #fff;
+    padding: 8px 15px; cursor: pointer;
+    font-size: 0.82rem; font-weight: 500;
+    font-family: 'DM Sans', sans-serif; transition: background 0.2s;
+  }
+  .search-input-wrap button:hover { background: #333; }
+  .listings-stats { font-size: 0.8rem; color: #9e9b94; margin-left: auto; white-space: nowrap; }
+  .listings-stats strong { color: #4a4840; }
+
+  /* ── Body split ── */
+  .listings-body { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+  /* ── Sidebar ── */
+  .listings-sidebar {
+    width: 340px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    padding: 1rem 0.875rem;
+    border-right: 1px solid #e8e6e0;
+    background: #faf9f6;
+  }
+
+  /* ── Listing card ── */
+  .listing-card {
+    background: #fff;
+    border: 1px solid #e8e6e0;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+    position: relative;
+    cursor: pointer;
+  }
+  .listing-card:hover { border-color: #c8c4bc; }
+  .listing-card.active { border-color: #1a1917; box-shadow: 0 0 0 1px #1a1917; }
+
+  .listing-card-inner { display: flex; }
+  .card-image-wrap { width: 96px; flex-shrink: 0; overflow: hidden; }
+  .card-image-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card-image-placeholder {
+    width: 100%; min-height: 88px; background: #f0ede6;
+    display: flex; align-items: center; justify-content: center;
+    color: #c8c4bc; font-size: 18px;
+  }
+  .card-content { flex: 1; padding: 0.75rem 0.875rem 0.75rem 0.8rem; min-width: 0; }
+  .card-title { font-size: 0.875rem; font-weight: 600; color: #1a1917; margin: 0 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 28px; }
+  .card-address { font-size: 0.74rem; color: #9e9b94; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-price { font-size: 0.9rem; font-weight: 600; color: #1a1917; margin-bottom: 5px; }
+  .card-price.unknown { color: #b8b5ae; font-weight: 400; font-size: 0.8rem; }
+  .card-badges { display: flex; flex-wrap: wrap; gap: 3px; }
+  .card-badge { font-size: 0.68rem; padding: 2px 7px; border-radius: 20px; background: #f0ede6; color: #6a6760; border: 1px solid #e2dfd7; }
+
+  /* Fav button */
+  .fav-btn {
+    position: absolute; top: 7px; right: 7px;
+    background: rgba(255,255,255,0.92); border: 1px solid #e2dfd7;
+    border-radius: 50%; width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 13px; color: #9e9b94;
+    transition: color 0.2s, border-color 0.2s; text-decoration: none; line-height: 1; z-index: 2;
+  }
+  .fav-btn:hover { color: #e05a5a; border-color: #e05a5a; }
+  .fav-btn.active { color: #e05a5a; border-color: #e05a5a; }
+  .fav-btn form { margin: 0; }
+  .fav-btn button { background: none; border: none; padding: 0; cursor: pointer; font-size: 13px; color: inherit; line-height: 1; display: flex; align-items: center; justify-content: center; }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 3rem 1rem; color: #9e9b94; font-size: 0.875rem; }
+
+  /* ── Map panel ── */
+  .map-panel { flex: 1; position: relative; }
+  #map { width: 100%; height: 100%; }
+
+  /* ── Detail panel (slides in from right over the map) ── */
+  .detail-panel {
+    position: absolute;
+    top: 0; right: 0;
+    width: 320px;
+    height: 100%;
+    background: #fff;
+    border-left: 1px solid #e8e6e0;
+    box-shadow: -4px 0 24px rgba(0,0,0,0.08);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .detail-panel.open { transform: translateX(0); }
+
+  .detail-panel-close {
+    position: absolute;
+    top: 10px; right: 12px;
+    background: none; border: none;
+    font-size: 22px; color: #9e9b94;
+    cursor: pointer; line-height: 1;
+    transition: color 0.15s; z-index: 2;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .detail-panel-close:hover { color: #1a1917; }
+
+  .detail-panel-image {
+    width: 100%; height: 180px;
+    object-fit: cover; display: block;
+    flex-shrink: 0;
+  }
+  .detail-panel-image-placeholder {
+    width: 100%; height: 180px;
+    background: #f0ede6;
+    display: flex; align-items: center;
+    justify-content: center; color: #c8c4bc;
+    font-size: 36px; flex-shrink: 0;
+  }
+
+  .detail-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.125rem 1.25rem 1.5rem;
+  }
+
+  .dp-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.2rem; color: #1a1917;
+    margin: 0 0 3px; line-height: 1.2;
+    padding-right: 28px;
+  }
+  .dp-addr { font-size: 0.78rem; color: #79776e; margin-bottom: 0.75rem; }
+  .dp-price { font-size: 1.1rem; font-weight: 600; color: #1a1917; margin-bottom: 0.75rem; }
+  .dp-price.unknown { color: #b8b5ae; font-weight: 400; font-size: 0.875rem; }
+
+  .dp-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 0.875rem; }
+  .dp-badge { font-size: 0.7rem; padding: 3px 8px; border-radius: 20px; background: #f0ede6; color: #4a4840; border: 1px solid #e2dfd7; }
+  .dp-badge-avail { background: #e8f4ec; border-color: #b8dfc2; color: #2a6e3f; }
+
+  .dp-divider { height: 1px; background: #ede9e2; margin: 0.75rem 0; }
+
+  .dp-section-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: #9e9b94; margin-bottom: 0.5rem; font-weight: 500; }
+
+  .dp-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 0.875rem; }
+  .dp-fact-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.07em; color: #9e9b94; margin-bottom: 2px; }
+  .dp-fact-value { font-size: 0.82rem; font-weight: 500; color: #1a1917; }
+  .dp-fact-value.unk { color: #b8b5ae; font-weight: 400; }
+
+  .dp-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 0.25rem; }
+  .dp-btn-primary {
+    display: block; text-align: center;
+    font-size: 0.875rem; font-weight: 500;
+    color: #fff; background: #1a1917;
+    text-decoration: none; padding: 10px 16px;
+    border-radius: 8px; transition: background 0.15s;
+    font-family: 'DM Sans', sans-serif;
+    border: none; cursor: pointer; width: 100%;
+  }
+  .dp-btn-primary:hover { background: #333; color: #fff; }
+  .dp-btn-secondary {
+    display: block; text-align: center;
+    font-size: 0.875rem; font-weight: 500;
+    color: #1a1917; background: transparent;
+    text-decoration: none; padding: 10px 16px;
+    border-radius: 8px; border: 1px solid #d4d0c9;
+    transition: background 0.15s, border-color 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .dp-btn-secondary:hover { background: #f8f7f4; border-color: #9e9b94; color: #1a1917; }
+
+  /* Mobile */
+  @media (max-width: 768px) {
+    .listings-body { flex-direction: column; overflow: visible; }
+    .listings-sidebar { width: 100%; border-right: none; border-bottom: 1px solid #e8e6e0; max-height: 45vh; overflow-y: auto; }
+    .map-panel { height: 55vh; flex: none; }
+    .listings-page { height: auto; overflow: visible; }
+    .detail-panel { width: 100%; height: 70%; top: auto; bottom: 0; right: 0; transform: translateY(100%); border-left: none; border-top: 1px solid #e8e6e0; }
+    .detail-panel.open { transform: translateY(0); }
+  }
+  .leaflet-control-attribution {
+  font-size: 9px !important;
+  opacity: 0.5;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
+<div class="listings-page">
 
-  <div class="row mb-4">
-    <form method="get" class="col-md-6">
-      <div class="input-group">
+  <div class="listings-topbar">
+    <form method="get" class="search-form">
+      <div class="search-input-wrap">
         <input
-          type="search"
-          name="q"
-          class="form-control"
-          placeholder="Search"
+          type="search" name="q"
+          placeholder="Search by name, address..."
           value="{% if q %}{{ q }}{% endif %}"
+          autocomplete="off"
         >
-        <button type="submit" class="btn btn-primary">Search</button>
+        <button type="submit">Search</button>
       </div>
     </form>
+    <div class="listings-stats">
+      {% if total %}<strong>{{ total }}</strong> listings &middot; {% endif %}
+      <strong>{{ num_leasing }}</strong> leasing co{% if num_leasing != 1 %}s{% endif %}
+    </div>
   </div>
 
-  <div class="row">
-    <div class="col-md-4" style="max-height: 80vh; overflow-y: auto;">
-      <h4 class="mb-3">Listings {% if total %} ({{ total }}){% endif %}</h4>
-      <p>Total Leasing Companies: {{ num_leasing }}</p>
+  <div class="listings-body">
 
+    <!-- Card list -->
+    <div class="listings-sidebar">
       {% for listing in listings %}
-        <div class="card mb-3 position-relative">
-          <div class="card-body">
-
-            {% if user.is_authenticated %}
-              <form method="post"
-                    action="{% url 'toggle_favorite_apartment' listing.pk %}"
-                    class="position-absolute top-0 end-0 m-2">
+        <div
+          class="listing-card"
+          id="card-{{ listing.pk }}"
+          data-id="{{ listing.pk }}"
+          data-name="{{ listing.name }}"
+          data-address="{{ listing.address }}"
+          data-url="{{ listing.get_absolute_url }}"
+          data-image="{{ listing.apartments_images|default:'' }}"
+          data-lat="{{ listing.latitude|default:'' }}"
+          data-lng="{{ listing.longitude|default:'' }}"
+          data-price="{% if listing.prices and listing.prices|length %}{% if listing.prices|length == 1 %}${{ listing.prices.0|floatformat:0 }}/mo{% else %}${{ listing.prices|first|floatformat:0 }}–${{ listing.prices|last|floatformat:0 }}/mo{% endif %}{% elif listing.additional_amenities.price_raw %}{{ listing.additional_amenities.price_raw }}{% else %}{% endif %}"
+          data-beds="{{ listing.bedrooms|default:'' }}"
+          data-baths="{{ listing.bathrooms|default:'' }}"
+          data-sqft="{{ listing.sqft_living|default:'' }}"
+          data-pets="{% if listing.pets is True %}Allowed{% elif listing.pets is False %}Not allowed{% else %}Unknown{% endif %}"
+          data-furnished="{% if listing.furnished is True %}Yes{% elif listing.furnished is False %}No{% else %}Unknown{% endif %}"
+          data-wd="{% if listing.washer_dryer_in_unit is True %}Yes{% elif listing.washer_dryer_in_unit is False %}No{% else %}Unknown{% endif %}"
+          data-housing="{{ listing.housing_type|default:'' }}"
+          data-avail="{{ listing.additional_amenities.availability_raw|default:'' }}"
+          onclick="selectListing(this)"
+        >
+          {% if user.is_authenticated %}
+            <div class="fav-btn {% if listing.pk in favorite_ids %}active{% endif %}" onclick="event.stopPropagation()">
+              <form method="post" action="{% url 'toggle_favorite_apartment' listing.pk %}">
                 {% csrf_token %}
-                <button type="submit"
-                        class="btn btn-light border rounded-circle"
-                        style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
+                <button type="submit" title="Save">
                   {% if listing.pk in favorite_ids %}♥{% else %}♡{% endif %}
                 </button>
               </form>
-            {% else %}
-              <a href="{% url 'account_login' %}?next={{ request.path }}"
-                 class="position-absolute top-0 end-0 m-2 btn btn-light border rounded-circle"
-                 style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;">
-                ♡
-              </a>
-            {% endif %}
+            </div>
+          {% else %}
+            <a href="{% url 'account_login' %}?next={{ request.path }}" class="fav-btn" onclick="event.stopPropagation()" title="Save">♡</a>
+          {% endif %}
 
-            <div class="d-flex gap-3">
+          <div class="listing-card-inner">
+            <div class="card-image-wrap">
               {% if listing.apartments_images %}
-                <img
-                  src="{{ listing.apartments_images }}"
-                  alt="Listing image"
-                  class="rounded border"
-                  style="width:84px;height:84px;object-fit:cover;"
-                >
+                <img src="{{ listing.apartments_images }}" alt="{{ listing.name }}">
+              {% else %}
+                <div class="card-image-placeholder">&#9634;</div>
               {% endif %}
-
-              <div class="flex-grow-1">
-                <h5 class="card-title mb-1">{{ listing.name }}</h5>
-                <div class="text-muted small mb-2">{{ listing.address }}</div>
-
-                {# price now prices (list) #}
-                <div class="fw-bold mb-2">
-                  {% if listing.prices and listing.prices|length %}
-                    {% if listing.prices|length == 1 %}
-                      ${{ listing.prices.0|floatformat:0 }}
-                    {% else %}
-                      ${{ listing.prices|first|floatformat:0 }} - ${{ listing.prices|last|floatformat:0 }}
-                    {% endif %}
-                  {% elif listing.additional_amenities.price_raw %}
-                    {{ listing.additional_amenities.price_raw }}
-                  {% else %}
-                    <span class="text-muted fw-normal">Price unknown</span>
-                  {% endif %}
-                </div>
-
-                <div class="d-flex flex-wrap gap-2 mb-2">
-                  {% if listing.bedrooms is not None %}
-                    <span class="badge text-bg-secondary">{{ listing.bedrooms }} bd</span>
-                  {% endif %}
-                  {% if listing.bathrooms is not None %}
-                    <span class="badge text-bg-secondary">{{ listing.bathrooms }} ba</span>
-                  {% endif %}
-                  {% if listing.sqft_living %}
-                    <span class="badge text-bg-secondary">{{ listing.sqft_living }} sqft</span>
-                  {% endif %}
-                </div>
-
-                <a href="{{ listing.get_absolute_url }}" class="btn btn-primary btn-sm">
-                  View Details
-                </a>
+            </div>
+            <div class="card-content">
+              <div class="card-title">{{ listing.name }}</div>
+              <div class="card-address">{{ listing.address }}</div>
+              <div class="card-price {% if not listing.prices and not listing.additional_amenities.price_raw %}unknown{% endif %}">
+                {% if listing.prices and listing.prices|length %}
+                  {% if listing.prices|length == 1 %}${{ listing.prices.0|floatformat:0 }}/mo
+                  {% else %}${{ listing.prices|first|floatformat:0 }}&ndash;${{ listing.prices|last|floatformat:0 }}/mo{% endif %}
+                {% elif listing.additional_amenities.price_raw %}{{ listing.additional_amenities.price_raw }}
+                {% else %}Price not listed{% endif %}
+              </div>
+              <div class="card-badges">
+                {% if listing.bedrooms is not None %}<span class="card-badge">{{ listing.bedrooms }}bd</span>{% endif %}
+                {% if listing.bathrooms is not None %}<span class="card-badge">{{ listing.bathrooms }}ba</span>{% endif %}
+                {% if listing.sqft_living %}<span class="card-badge">{{ listing.sqft_living }} sqft</span>{% endif %}
               </div>
             </div>
-
           </div>
         </div>
       {% empty %}
-        <p>No listings found. Try adjusting your filter.</p>
+        <div class="empty-state">No listings found.<br>Try adjusting your search.</div>
       {% endfor %}
     </div>
 
-    <div class="col-md-8">
-      <div class="border rounded d-flex align-items-center justify-content-center overflow-hidden"
-           style="height: 80vh; background-color: #f8f9fa;">
-        Map goes here
+    <!-- Map -->
+    <div class="map-panel">
+      <div id="map"></div>
+
+      <!-- Detail panel slides in over the map from the right -->
+      <div class="detail-panel" id="detail-panel">
+        <button class="detail-panel-close" onclick="closeDetailPanel()" title="Close">&times;</button>
+        <div id="detail-panel-content" style="display:flex;flex-direction:column;height:100%;"></div>
       </div>
     </div>
 
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<script>
+  // Theme toggle
+  const toggle = document.getElementById('theme-toggle');
+  const root = document.documentElement;
+  const savedTheme = localStorage.getItem('theme') || 'auto';
+  if (savedTheme !== 'auto') root.setAttribute('data-theme', savedTheme);
+  if (toggle) {
+    toggle.addEventListener('click', () => {
+      const current = root.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : current === 'light' ? 'auto' : 'dark';
+      root.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+    });
+  }
+
+  // ── Map init ──
+  const map = L.map('map', { zoomControl: true }).setView([40.1138, -88.2249], 13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd', maxZoom: 19
+  }).addTo(map);
+
+  // ── Marker icon factory ──
+  function makeIcon(price, active) {
+    const bg = active ? '#c8501a' : '#1a1917';
+    const label = price || '—';
+    const html = `
+      <div style="position:relative;display:inline-block;">
+        <div style="background:${bg};color:#fff;font-family:sans-serif;font-size:11px;
+          font-weight:600;padding:4px 8px;border-radius:6px;white-space:nowrap;
+          box-shadow:0 2px 6px rgba(0,0,0,.22);">${label}</div>
+        <div style="position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);
+          width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;
+          border-top:5px solid ${bg};"></div>
+      </div>`;
+    return L.divIcon({ html, className: '', iconAnchor: [28, 28] });
+  }
+
+  // ── Build markers ──
+  const cards = document.querySelectorAll('.listing-card');
+  const markers = {};
+  let activeId = null;
+
+  cards.forEach(card => {
+    const id  = card.dataset.id;
+    const lat = parseFloat(card.dataset.lat);
+    const lng = parseFloat(card.dataset.lng);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      const marker = L.marker([lat, lng], { icon: makeIcon(card.dataset.price, false) }).addTo(map);
+      marker.on('click', () => selectListing(card, true));
+      markers[id] = marker;
+    }
+  });
+
+  // Fit bounds to all markers
+  const allMarkers = Object.values(markers);
+  if (allMarkers.length > 0) {
+    map.fitBounds(L.featureGroup(allMarkers).getBounds().pad(0.1));
+  }
+
+  // ── Select listing ──
+  function selectListing(card, fromMarker) {
+    const id = card.dataset.id;
+
+    // Deactivate previous
+    if (activeId && activeId !== id) {
+      const prev = document.getElementById('card-' + activeId);
+      if (prev) prev.classList.remove('active');
+      if (markers[activeId]) markers[activeId].setIcon(makeIcon(prev ? prev.dataset.price : '', false));
+    }
+
+    // Toggle off if same card clicked again
+    if (activeId === id) {
+      card.classList.remove('active');
+      if (markers[id]) markers[id].setIcon(makeIcon(card.dataset.price, false));
+      closeDetailPanel();
+      activeId = null;
+      return;
+    }
+
+    activeId = id;
+    card.classList.add('active');
+
+    // Highlight marker and fly to it zoomed in
+    if (markers[id]) {
+      markers[id].setIcon(makeIcon(card.dataset.price, true));
+      map.flyTo(markers[id].getLatLng(), 17, { duration: 0.8 });
+    }
+
+    if (fromMarker) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    openDetailPanel(card);
+  }
+
+  // ── Detail panel ──
+  function openDetailPanel(card) {
+    const d = card.dataset;
+    const hasImage = d.image && d.image.trim() !== '';
+
+    const imgHtml = hasImage
+      ? `<img src="${esc(d.image)}" class="detail-panel-image" alt="${esc(d.name)}">`
+      : `<div class="detail-panel-image-placeholder">&#9634;</div>`;
+
+    const priceHtml = d.price
+      ? `<div class="dp-price">${esc(d.price)}</div>`
+      : `<div class="dp-price unknown">Price not listed</div>`;
+
+    const badges = [
+      d.beds    ? `<span class="dp-badge">${esc(d.beds)} bed${d.beds!='1'?'s':''}</span>` : '',
+      d.baths   ? `<span class="dp-badge">${esc(d.baths)} bath${d.baths!='1'?'s':''}</span>` : '',
+      d.sqft    ? `<span class="dp-badge">${esc(d.sqft)} sqft</span>` : '',
+      d.housing ? `<span class="dp-badge">${esc(d.housing)}</span>` : '',
+      d.avail   ? `<span class="dp-badge dp-badge-avail">Available ${esc(d.avail)}</span>` : '',
+    ].filter(Boolean).join('');
+
+    document.getElementById('detail-panel-content').innerHTML = `
+      ${imgHtml}
+      <div class="detail-panel-body">
+        <div class="dp-name">${esc(d.name)}</div>
+        <div class="dp-addr">${esc(d.address)}</div>
+        ${priceHtml}
+        ${badges ? `<div class="dp-badges">${badges}</div>` : ''}
+        <div class="dp-divider"></div>
+        <div class="dp-section-title">Details</div>
+        <div class="dp-facts">
+          <div>
+            <div class="dp-fact-label">Pets</div>
+            <div class="dp-fact-value ${d.pets==='Unknown'?'unk':''}">${esc(d.pets||'Unknown')}</div>
+          </div>
+          <div>
+            <div class="dp-fact-label">Furnished</div>
+            <div class="dp-fact-value ${d.furnished==='Unknown'?'unk':''}">${esc(d.furnished||'Unknown')}</div>
+          </div>
+          <div>
+            <div class="dp-fact-label">W/D in unit</div>
+            <div class="dp-fact-value ${d.wd==='Unknown'?'unk':''}">${esc(d.wd||'Unknown')}</div>
+          </div>
+        </div>
+        <div class="dp-divider"></div>
+        <div class="dp-actions">
+          <a href="${esc(d.url)}" class="dp-btn-primary">View full details &rarr;</a>
+          ${markers[d.id] ? `<button class="dp-btn-secondary" onclick="flyToActive()">&#9655; Show on map</button>` : ''}
+        </div>
+      </div>
+    `;
+
+    document.getElementById('detail-panel').classList.add('open');
+  }
+
+  function closeDetailPanel() {
+    document.getElementById('detail-panel').classList.remove('open');
+    if (activeId) {
+      const card = document.getElementById('card-' + activeId);
+      if (card) card.classList.remove('active');
+      if (markers[activeId]) markers[activeId].setIcon(makeIcon(card ? card.dataset.price : '', false));
+      activeId = null;
+    }
+  }
+
+  function flyToActive() {
+    if (!activeId || !markers[activeId]) return;
+    map.flyTo(markers[activeId].getLatLng(), 17, { duration: 0.6 });
+  }
+
+  function esc(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
 {% endblock %}

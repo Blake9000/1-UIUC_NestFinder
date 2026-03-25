@@ -1,112 +1,352 @@
 {% extends "base.html" %}
 
-{% block title %}
-  Listing Detail for {{ listing.name }}
+{% block title %}{{ listing.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+
+
+  .listing-detail-wrap {
+    font-family: 'DM Sans', sans-serif;
+    background: #f8f7f4;
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+
+  .listing-card {
+    max-width: 860px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e8e6e0;
+    overflow: hidden;
+  }
+
+  /* ── Image gallery ── */
+  .gallery {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 280px 140px;
+    gap: 3px;
+    background: #e8e6e0;
+  }
+  .gallery a { display: block; overflow: hidden; }
+  .gallery a:first-child { grid-row: 1 / 3; }
+  .gallery img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease;
+  }
+  .gallery a:hover img { transform: scale(1.04); }
+  .gallery-placeholder {
+    grid-column: 1 / -1;
+    height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f0ede6;
+    color: #aaa8a0;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Main content ── */
+  .listing-body { padding: 2rem 2.25rem; }
+
+  .listing-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .listing-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.75rem;
+    font-weight: 400;
+    color: #1a1917;
+    margin: 0 0 0.25rem;
+    line-height: 1.2;
+  }
+
+  .listing-address {
+    font-size: 0.9rem;
+    color: #79776e;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .listing-address::before {
+    content: '';
+    display: inline-block;
+    width: 10px; height: 13px;
+    background: #79776e;
+    clip-path: polygon(50% 0%, 100% 35%, 100% 65%, 50% 100%, 0% 65%, 0% 35%);
+    flex-shrink: 0;
+  }
+
+  .price-block { text-align: right; flex-shrink: 0; }
+  .price-main {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.75rem;
+    color: #1a1917;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .price-sub { font-size: 0.78rem; color: #79776e; margin-top: 3px; }
+  .price-raw { font-size: 0.78rem; color: #9e9b94; }
+
+  /* ── Badges ── */
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1.5rem; }
+  .badge {
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid #e2dfd7;
+    background: #faf9f6;
+    color: #4a4840;
+    letter-spacing: 0.01em;
+  }
+  .badge-avail {
+    background: #e8f4ec;
+    border-color: #b8dfc2;
+    color: #2a6e3f;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: #ede9e2;
+    margin: 1.5rem 0;
+  }
+
+  /* ── Key facts grid ── */
+  .facts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .fact-item {}
+  .fact-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #9e9b94;
+    margin-bottom: 4px;
+  }
+  .fact-value {
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #1a1917;
+  }
+  .fact-value.unknown { color: #b8b5ae; font-weight: 400; }
+
+  /* ── Amenities ── */
+  .amenities-list {
+    list-style: none;
+    padding: 0; margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 6px 1.5rem;
+  }
+  .amenities-list li {
+    font-size: 0.88rem;
+    color: #4a4840;
+    padding-left: 1.1rem;
+    position: relative;
+    line-height: 1.5;
+  }
+  .amenities-list li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: #4a9e6a;
+    font-size: 0.8rem;
+  }
+
+  /* ── Meta footer ── */
+  .listing-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 2rem;
+    font-size: 0.8rem;
+    color: #9e9b94;
+    margin-bottom: 1.5rem;
+  }
+  .listing-meta strong { color: #5a5852; }
+
+  /* ── CTA buttons ── */
+  .cta-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .btn-primary-custom {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #1a1917;
+    color: #fff;
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: 8px;
+    transition: background 0.2s;
+    letter-spacing: 0.01em;
+  }
+  .btn-primary-custom:hover { background: #333; color: #fff; }
+
+  .btn-outline-custom {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: transparent;
+    color: #4a4840;
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid #d4d0c9;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .btn-outline-custom:hover { border-color: #9e9b94; background: #faf9f6; }
+
+  /* Section title */
+  .section-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #9e9b94;
+    margin: 0 0 0.75rem;
+    font-weight: 500;
+  }
+
+  @media (max-width: 600px) {
+    .listing-body { padding: 1.25rem; }
+    .listing-header { flex-direction: column; gap: 0.5rem; }
+    .price-block { text-align: left; }
+    .gallery { grid-template-columns: 1fr; grid-template-rows: auto; }
+    .gallery a:first-child { grid-row: auto; }
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="container py-4">
+<div class="listing-detail-wrap">
+  <div class="listing-card">
 
-  <div class="card shadow-sm">
-    <div class="card-body">
+    {% if listing.apartments_images or listing.additional_amenities.image_urls %}
+      <div class="gallery">
+        {% if listing.apartments_images %}
+          <a href="{{ listing.apartments_images }}" target="_blank" rel="noopener">
+            <img src="{{ listing.apartments_images }}" alt="Main apartment photo">
+          </a>
+        {% endif %}
+        {% if listing.additional_amenities.image_urls %}
+          {% for u in listing.additional_amenities.image_urls %}
+            {% if u != listing.apartments_images %}
+              <a href="{{ u }}" target="_blank" rel="noopener">
+                <img src="{{ u }}" alt="Apartment photo">
+              </a>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="gallery">
+        <div class="gallery-placeholder">No photos available</div>
+      </div>
+    {% endif %}
 
-      <div class="d-flex justify-content-between align-items-start gap-3">
+    <div class="listing-body">
+
+      <div class="listing-header">
         <div>
-          <h1 class="h4 mb-1">{{ listing.name }}</h1>
-          <div class="text-muted">{{ listing.address }}</div>
+          <h1 class="listing-name">{{ listing.name }}</h1>
+          <div class="listing-address">{{ listing.address }}</div>
         </div>
         {% if listing.prices and listing.prices|length %}
-          <div class="text-end">
-            <div class="fs-5 fw-semibold">
+          <div class="price-block">
+            <div class="price-main">
               {% if listing.prices|length == 1 %}
                 ${{ listing.prices.0|floatformat:0 }}
               {% else %}
-                ${{ listing.prices|first|floatformat:0 }} - ${{ listing.prices|last|floatformat:0 }}
+                ${{ listing.prices|first|floatformat:0 }}&ndash;${{ listing.prices|last|floatformat:0 }}
               {% endif %}
             </div>
-            <div class="text-muted small">per month</div>
-
+            <div class="price-sub">per month</div>
             {% if listing.additional_amenities.price_raw %}
-              <div class="text-muted small">{{ listing.additional_amenities.price_raw }}</div>
+              <div class="price-raw">{{ listing.additional_amenities.price_raw }}</div>
             {% endif %}
           </div>
         {% elif listing.additional_amenities.price_raw %}
-          <div class="text-end">
-            <div class="fs-5 fw-semibold">{{ listing.additional_amenities.price_raw }}</div>
-            <div class="text-muted small">per month</div>
+          <div class="price-block">
+            <div class="price-main">{{ listing.additional_amenities.price_raw }}</div>
+            <div class="price-sub">per month</div>
           </div>
         {% endif %}
       </div>
 
-      <hr>
-
-      <div class="d-flex flex-wrap gap-2 mb-3">
+      <div class="badges">
         {% if listing.bedrooms is not None %}
-          <span class="badge text-bg-secondary">{{ listing.bedrooms }} bd</span>
+          <span class="badge">{{ listing.bedrooms }} bed{% if listing.bedrooms != 1 %}s{% endif %}</span>
         {% endif %}
         {% if listing.bathrooms is not None %}
-          <span class="badge text-bg-secondary">{{ listing.bathrooms }} ba</span>
+          <span class="badge">{{ listing.bathrooms }} bath{% if listing.bathrooms != 1 %}s{% endif %}</span>
         {% endif %}
         {% if listing.sqft_living %}
-          <span class="badge text-bg-secondary">{{ listing.sqft_living }} sqft</span>
+          <span class="badge">{{ listing.sqft_living }} sqft</span>
         {% endif %}
         {% if listing.floors %}
-          <span class="badge text-bg-secondary">
-            {{ listing.floors }} floor{% if listing.floors != 1 %}s{% endif %}
-          </span>
+          <span class="badge">{{ listing.floors }} floor{% if listing.floors != 1 %}s{% endif %}</span>
         {% endif %}
         {% if listing.housing_type %}
-          <span class="badge text-bg-secondary">{{ listing.housing_type }}</span>
+          <span class="badge">{{ listing.housing_type }}</span>
         {% endif %}
-
         {% if listing.additional_amenities.availability_raw %}
-          <span class="badge text-bg-info">
-            Availability: {{ listing.additional_amenities.availability_raw }}
-          </span>
+          <span class="badge badge-avail">Available {{ listing.additional_amenities.availability_raw }}</span>
         {% endif %}
       </div>
 
-      <div class="row g-3 mb-3">
-        <div class="col-md-4">
-          <div class="small text-muted">Pets</div>
-          <div>
-            {% if listing.pets is True %}Yes
-            {% elif listing.pets is False %}No
+      <div class="divider"></div>
+
+      <p class="section-title">Details</p>
+      <div class="facts-grid">
+        <div class="fact-item">
+          <div class="fact-label">Pets</div>
+          <div class="fact-value {% if listing.pets is None %}unknown{% endif %}">
+            {% if listing.pets is True %}Allowed
+            {% elif listing.pets is False %}Not allowed
             {% else %}Unknown
             {% endif %}
           </div>
         </div>
-
-        <div class="col-md-4">
-          <div class="small text-muted">Furnished</div>
-          <div>
+        <div class="fact-item">
+          <div class="fact-label">Furnished</div>
+          <div class="fact-value {% if listing.furnished is None %}unknown{% endif %}">
             {% if listing.furnished is True %}Yes
             {% elif listing.furnished is False %}No
             {% else %}Unknown
             {% endif %}
           </div>
         </div>
-
-        <div class="col-md-4">
-          <div class="small text-muted">Internet</div>
-          <div>
-            {% if listing.internet %}{{ listing.internet }}{% else %}<span class="text-muted">Unknown</span>{% endif %}
+        <div class="fact-item">
+          <div class="fact-label">Internet</div>
+          <div class="fact-value {% if not listing.internet %}unknown{% endif %}">
+            {% if listing.internet %}{{ listing.internet }}{% else %}Unknown{% endif %}
           </div>
         </div>
-
-        <div class="col-md-4">
-          <div class="small text-muted">Washer/Dryer in unit</div>
-          <div>
+        <div class="fact-item">
+          <div class="fact-label">W/D In Unit</div>
+          <div class="fact-value {% if listing.washer_dryer_in_unit is None %}unknown{% endif %}">
             {% if listing.washer_dryer_in_unit is True %}Yes
             {% elif listing.washer_dryer_in_unit is False %}No
             {% else %}Unknown
             {% endif %}
           </div>
         </div>
-
-        <div class="col-md-4">
-          <div class="small text-muted">Washer/Dryer on site</div>
-          <div>
+        <div class="fact-item">
+          <div class="fact-label">W/D On Site</div>
+          <div class="fact-value {% if listing.washer_dryer_out_unit is None %}unknown{% endif %}">
             {% if listing.washer_dryer_out_unit is True %}Yes
             {% elif listing.washer_dryer_out_unit is False %}No
             {% else %}Unknown
@@ -115,82 +355,48 @@
         </div>
       </div>
 
-      {% if listing.apartments_images or listing.additional_amenities.image_urls %}
-        <hr>
-        <h2 class="h6">Images</h2>
-
-        <div class="row g-2">
-          {% if listing.apartments_images %}
-            <div class="col-6 col-md-4 col-lg-3">
-              <a href="{{ listing.apartments_images }}" target="_blank" rel="noopener">
-                <img src="{{ listing.apartments_images }}" class="img-fluid rounded border" alt="Apartment image">
-              </a>
-            </div>
-          {% endif %}
-
-          {% if listing.additional_amenities.image_urls %}
-            {% for u in listing.additional_amenities.image_urls %}
-              {% if u != listing.apartments_images %}
-                <div class="col-6 col-md-4 col-lg-3">
-                  <a href="{{ u }}" target="_blank" rel="noopener">
-                    <img src="{{ u }}" class="img-fluid rounded border" alt="Apartment image">
-                  </a>
-                </div>
-              {% endif %}
-            {% endfor %}
-          {% endif %}
-        </div>
-      {% endif %}
-
       {% if listing.additional_amenities %}
-        <hr>
-        <h2 class="h6">Additional amenities</h2>
-
+        <div class="divider"></div>
+        <p class="section-title">Amenities</p>
         {% if listing.additional_amenities.features %}
-          <ul class="mb-0">
+          <ul class="amenities-list">
             {% for feat in listing.additional_amenities.features %}
               <li>{{ feat }}</li>
             {% endfor %}
           </ul>
         {% else %}
-          <pre class="mb-0">{{ listing.additional_amenities }}</pre>
+          <pre style="font-size:0.82rem; color:#79776e; white-space: pre-wrap;">{{ listing.additional_amenities }}</pre>
         {% endif %}
       {% endif %}
 
-      <hr>
+      <div class="divider"></div>
 
-      <div class="d-flex flex-column gap-1 small text-muted">
+      <div class="listing-meta">
         {% if listing.leasingCompany %}
-          <div>
-            Leasing company:
-            <strong>{{ listing.leasingCompany.name }}</strong>
-          </div>
+          <span>Listed by <strong>{{ listing.leasingCompany.name }}</strong></span>
         {% endif %}
-
         {% if listing.date_posted %}
-          <div>Posted: {{ listing.date_posted }}</div>
+          <span>Posted {{ listing.date_posted }}</span>
         {% endif %}
         {% if listing.date_scraped %}
-          <div>Scraped: {{ listing.date_scraped }}</div>
+          <span>Updated {{ listing.date_scraped }}</span>
         {% endif %}
       </div>
 
-      <div class="mt-3 d-flex gap-2">
+      <div class="cta-row">
         {% if listing.apartments_url %}
-          <a href="{{ listing.apartments_url }}" target="_blank" rel="noopener" class="btn btn-primary">
-            View listing
+          <a href="{{ listing.apartments_url }}" target="_blank" rel="noopener" class="btn-primary-custom">
+            View listing &rarr;
           </a>
         {% endif %}
-
         {% if listing.leasingCompany and listing.leasingCompany.url %}
-          <a href="{{ listing.leasingCompany.url }}" target="_blank" rel="noopener" class="btn btn-outline-secondary">
-            Leasing company site
+          <a href="{{ listing.leasingCompany.url }}" target="_blank" rel="noopener" class="btn-outline-custom">
+            Leasing company
           </a>
         {% endif %}
       </div>
 
     </div>
   </div>
-
 </div>
 {% endblock %}

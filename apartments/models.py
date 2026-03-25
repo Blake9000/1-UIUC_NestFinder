@@ -44,6 +44,9 @@ class Apartment(models.Model):
     date_scraped = models.DateTimeField(null=True, blank=True)
 
     additional_amenities = models.JSONField(null=True, blank=True)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+
 
     def __str__(self):
         return f"{self.name} at {self.address}".strip()
