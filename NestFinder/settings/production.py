@@ -13,6 +13,8 @@ STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesSto
 # Replace it with your name:
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'https://bmackin2.pythonanywhere.com','bmackin2.pythonanywhere.com', 'nestfinder.blake4it.com']
 
+CSRF_TRUSTED_ORIGINS = ["https://nestfinder.blake4it.com"]
+
 # Database for the development server
 DATABASES = {
     'default': {
@@ -25,6 +27,8 @@ DATABASES = {
 CORS_ALLOWED_ORIGINS = [
     "https://vega.github.io",
     'https://bmackin2.pythonanywhere.com',
+    'https://nestfinder.blake4it.com',
+    'http://nestfinder.blake4it.com',
 ]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
