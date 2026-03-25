@@ -26,3 +26,6 @@ CORS_ALLOWED_ORIGINS = [
     "https://vega.github.io",
     'https://bmackin2.pythonanywhere.com',
 ]
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
