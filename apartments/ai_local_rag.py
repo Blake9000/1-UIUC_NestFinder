@@ -4,34 +4,31 @@ import json
 import pickle
 import re
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 _EMBED_MODEL = None
-_GEN_MODEL = None
-_GEN_TOKENIZER = None
 _INDEX_CACHE = None
-_TORCH = None
 _LOCK = threading.Lock()
 
-EMBEDDING_MODEL_NAME = "intfloat/multilingual-e5-large-instruct"
-GEN_MODEL_NAME = "HuggingFaceTB/SmolLM2-360M-Instruct"
+# Smaller and faster CPU-friendly embedding model.
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 DEVICE = "cpu"
-EMBED_BATCH_SIZE = 8
+EMBED_BATCH_SIZE = 32
 RETRIEVE_TOP_K = 8
 FINAL_TOP_K = 3
-MAX_INPUT_TOKENS = 1200
-INDEX_MAX_AGE = timedelta(days=1)
-USE_GENERATOR = True
+ALLOW_STALE_INDEX = True
 
 CACHE_DIR = Path(__file__).resolve().parents[1] / "data"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 INDEX_CACHE_PATH = CACHE_DIR / "apartment_embedding_index.pkl"
 
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "best", "between", "do", "for", "from",
+    "get", "give", "has", "have", "i", "in", "is", "it", "me", "my", "near", "of", "on",
+    "or", "please", "show", "that", "the", "to", "want", "which", "with", "within", "you",
+}
 
 
 def _parse_datetime(value: Any) -> datetime | None:
@@ -54,22 +51,16 @@ def _parse_datetime(value: Any) -> datetime | None:
     return dt.astimezone(timezone.utc)
 
 
-def _import_local_ml_dependencies():
-    global _TORCH
+def _import_sentence_transformers():
     try:
-        import torch
         from sentence_transformers import SentenceTransformer
-        from transformers import AutoModelForCausalLM, AutoTokenizer
     except Exception as exc:
         raise RuntimeError(
-            "Local RAG dependencies could not be loaded. "
-            "For CPU-only Windows environments, reinstall a CPU-only build of PyTorch, then reinstall "
-            "transformers and sentence-transformers. Original error: "
-            f"{exc}"
+            "Local embedding dependencies could not be loaded. "
+            "Install sentence-transformers and a working CPU PyTorch build. "
+            f"Original error: {exc}"
         ) from exc
-
-    _TORCH = torch
-    return torch, SentenceTransformer, AutoModelForCausalLM, AutoTokenizer
+    return SentenceTransformer
 
 
 def load_embedding_model():
@@ -82,40 +73,14 @@ def load_embedding_model():
         if _EMBED_MODEL is not None:
             return _EMBED_MODEL
 
-        _, SentenceTransformer, _, _ = _import_local_ml_dependencies()
+        SentenceTransformer = _import_sentence_transformers()
         _EMBED_MODEL = SentenceTransformer(
             EMBEDDING_MODEL_NAME,
-            trust_remote_code=True,
+            trust_remote_code=False,
             device=DEVICE,
         )
 
     return _EMBED_MODEL
-
-
-def load_generator_model():
-    global _GEN_MODEL, _GEN_TOKENIZER
-
-    if _GEN_MODEL is not None and _GEN_TOKENIZER is not None:
-        return _GEN_MODEL, _GEN_TOKENIZER
-
-    with _LOCK:
-        if _GEN_MODEL is not None and _GEN_TOKENIZER is not None:
-            return _GEN_MODEL, _GEN_TOKENIZER
-
-        torch, _, AutoModelForCausalLM, AutoTokenizer = _import_local_ml_dependencies()
-
-        if _GEN_TOKENIZER is None:
-            _GEN_TOKENIZER = AutoTokenizer.from_pretrained(GEN_MODEL_NAME)
-            if _GEN_TOKENIZER.pad_token_id is None:
-                _GEN_TOKENIZER.pad_token = _GEN_TOKENIZER.eos_token
-
-        if _GEN_MODEL is None:
-            _GEN_MODEL = AutoModelForCausalLM.from_pretrained(GEN_MODEL_NAME)
-            _GEN_MODEL.to(DEVICE)
-            _GEN_MODEL.eval()
-            torch.set_grad_enabled(False)
-
-    return _GEN_MODEL, _GEN_TOKENIZER
 
 
 def build_listing_document(apartment: dict[str, Any]) -> str:
@@ -123,12 +88,9 @@ def build_listing_document(apartment: dict[str, Any]) -> str:
     price_min = apartment.get("price_min")
     price_max = apartment.get("price_max")
 
-    price_text = "Price unknown"
+    price_text = "price unknown"
     if price_min is not None and price_max is not None:
-        if price_min == price_max:
-            price_text = f"${price_min:.0f}"
-        else:
-            price_text = f"${price_min:.0f} to ${price_max:.0f}"
+        price_text = f"${price_min:.0f}" if price_min == price_max else f"${price_min:.0f} to ${price_max:.0f}"
     elif prices:
         try:
             low = min(float(x) for x in prices)
@@ -137,33 +99,32 @@ def build_listing_document(apartment: dict[str, Any]) -> str:
         except Exception:
             pass
 
-    feature_lines = [
-        f"Apartment ID: {apartment.get('id')}",
-        f"Name: {apartment.get('name') or 'Unknown'}",
-        f"Address: {apartment.get('address') or 'Unknown'}",
-        f"Leasing company: {apartment.get('leasing_company') or 'Unknown'}",
-        f"Price: {price_text}",
-        f"Bedrooms: {apartment.get('bedrooms')}",
-        f"Bathrooms: {apartment.get('bathrooms')}",
-        f"Square feet: {apartment.get('sqft_living')}",
-        f"Housing type: {apartment.get('housing_type') or 'Unknown'}",
-        f"Pets allowed: {apartment.get('pets')}",
-        f"Furnished: {apartment.get('furnished')}",
-        f"In-unit washer/dryer: {apartment.get('washer_dryer_in_unit')}",
-        f"Shared washer/dryer: {apartment.get('washer_dryer_out_unit')}",
-        f"Internet: {apartment.get('internet') or 'Unknown'}",
-        f"Amenities: {apartment.get('amenities_text') or 'None listed'}",
+    details = [
+        f"Apartment ID {apartment.get('id')}",
+        f"name {apartment.get('name') or 'unknown'}",
+        f"address {apartment.get('address') or 'unknown'}",
+        f"leasing company {apartment.get('leasing_company') or 'unknown'}",
+        f"price {price_text}",
+        f"bedrooms {apartment.get('bedrooms')}",
+        f"bathrooms {apartment.get('bathrooms')}",
+        f"square feet {apartment.get('sqft_living')}",
+        f"housing type {apartment.get('housing_type') or 'unknown'}",
+        f"pets allowed {apartment.get('pets')}",
+        f"furnished {apartment.get('furnished')}",
+        f"in-unit laundry {apartment.get('washer_dryer_in_unit')}",
+        f"shared laundry {apartment.get('washer_dryer_out_unit')}",
+        f"internet {apartment.get('internet') or 'unknown'}",
     ]
 
-    additional_amenities = apartment.get("additional_amenities") or {}
-    if additional_amenities:
-        feature_lines.append(f"Additional amenities data: {json.dumps(additional_amenities, ensure_ascii=False)}")
+    amenities_text = apartment.get("amenities_text")
+    if amenities_text:
+        details.append(f"amenities {amenities_text}")
 
-    return "\n".join(str(line) for line in feature_lines)
+    return ". ".join(str(x) for x in details if x not in [None, ""])
 
 
 def _cache_signature(apartments: list[dict[str, Any]]) -> dict[str, Any]:
-    ids = []
+    ids: list[int] = []
     newest_scrape: datetime | None = None
 
     for apartment in apartments:
@@ -181,33 +142,13 @@ def _cache_signature(apartments: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _cache_is_fresh(cache_data: dict[str, Any], apartments: list[dict[str, Any]]) -> bool:
-    created_at = _parse_datetime(cache_data.get("created_at"))
-    if created_at is None:
-        return False
-
-    if _utcnow() - created_at > INDEX_MAX_AGE:
-        return False
-
-    return cache_data.get("signature") == _cache_signature(apartments)
-
-
-def format_query_for_embedding(query: str) -> str:
-    instruction = "Retrieve apartment listings that best satisfy the renter request."
-    return f"Instruct: {instruction}\nQuery: {query.strip()}"
-
-
-def format_passage_for_embedding(text: str) -> str:
-    return text.strip()
-
-
 def _build_index_from_apartments(apartments: list[dict[str, Any]]) -> dict[str, Any]:
     embed_model = load_embedding_model()
     docs = [build_listing_document(apartment) for apartment in apartments]
     ids = [apartment.get("id") for apartment in apartments]
 
     embeddings = embed_model.encode(
-        [format_passage_for_embedding(doc) for doc in docs],
+        docs,
         batch_size=EMBED_BATCH_SIZE,
         convert_to_numpy=True,
         normalize_embeddings=True,
@@ -215,12 +156,11 @@ def _build_index_from_apartments(apartments: list[dict[str, Any]]) -> dict[str, 
     )
 
     return {
-        "created_at": _utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "signature": _cache_signature(apartments),
         "ids": ids,
         "docs": docs,
         "embeddings": embeddings,
-        "apartments": apartments,
     }
 
 
@@ -242,149 +182,26 @@ def _write_disk_index(index_data: dict[str, Any]) -> None:
     temp_path.replace(INDEX_CACHE_PATH)
 
 
-def build_or_get_index(apartments: list[dict[str, Any]]):
+def _get_cached_index(apartments: list[dict[str, Any]]) -> tuple[dict[str, Any] | None, bool]:
     global _INDEX_CACHE
 
-    signature = _cache_signature(apartments)
+    current_signature = _cache_signature(apartments)
 
     with _LOCK:
         if _INDEX_CACHE is not None:
-            if _cache_is_fresh(_INDEX_CACHE, apartments):
-                return _INDEX_CACHE
-            _INDEX_CACHE = None
+            is_exact = _INDEX_CACHE.get("signature") == current_signature
+            if is_exact or ALLOW_STALE_INDEX:
+                return _INDEX_CACHE, not is_exact
 
         disk_index = _load_disk_index()
-        if disk_index is not None and _cache_is_fresh(disk_index, apartments):
-            _INDEX_CACHE = disk_index
-            return _INDEX_CACHE
+        if disk_index is None:
+            return None, False
 
-        index_data = _build_index_from_apartments(apartments)
-        _write_disk_index(index_data)
-        _INDEX_CACHE = index_data
-        return _INDEX_CACHE
-
-
-def retrieve_candidates(user_query: str, apartments: list[dict[str, Any]], top_k: int = RETRIEVE_TOP_K) -> list[dict[str, Any]]:
-    index_data = build_or_get_index(apartments)
-    embed_model = load_embedding_model()
-
-    query_embedding = embed_model.encode(
-        [format_query_for_embedding(user_query)],
-        convert_to_numpy=True,
-        normalize_embeddings=True,
-        show_progress_bar=False,
-    )[0]
-
-    scores = index_data["embeddings"] @ query_embedding
-    ranked_indices = sorted(range(len(scores)), key=lambda i: float(scores[i]), reverse=True)
-    ranked_indices = ranked_indices[: min(top_k, len(apartments))]
-
-    results = []
-    for idx in ranked_indices:
-        apartment = index_data["apartments"][idx]
-        results.append(
-            {
-                "score": float(scores[idx]),
-                "apartment": apartment,
-                "document": index_data["docs"][idx],
-            }
-        )
-    return results
-
-
-def build_rag_ranking_prompt(user_query: str, candidates: list[dict[str, Any]]) -> str:
-    context_blocks = []
-    for rank, item in enumerate(candidates, start=1):
-        context_blocks.append(
-            f"Candidate {rank}\n"
-            f"Retrieval score: {item['score']:.4f}\n"
-            f"{item['document']}"
-        )
-
-    context = "\n\n---\n\n".join(context_blocks)
-
-    return f"""
-Rank the apartment candidates for this renter request.
-
-User request:
-{user_query}
-
-Retrieved apartment candidates:
-{context}
-
-Return only JSON in this exact format:
-{{"top_3":[id1,id2,id3]}}
-
-Rules:
-- Return exactly 3 apartment IDs.
-- Best match first.
-- Only use apartment IDs shown in the retrieved candidates.
-- Prefer concrete constraints such as price, pets, bedrooms, bathrooms, furnished status, laundry, square footage, and amenities.
-- Do not invent facts.
-- No explanation.
-""".strip()
-
-
-def generate_small_model_response(prompt: str, max_new_tokens: int = 64) -> str:
-    torch, _, _, _ = _import_local_ml_dependencies()
-    gen_model, gen_tokenizer = load_generator_model()
-
-    messages = [
-        {"role": "system", "content": "You rank apartment listings and return strict JSON."},
-        {"role": "user", "content": prompt},
-    ]
-
-    input_text = gen_tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-    )
-
-    inputs = gen_tokenizer(
-        input_text,
-        return_tensors="pt",
-        truncation=True,
-        max_length=MAX_INPUT_TOKENS,
-    )
-    inputs = {k: v.to(DEVICE) for k, v in inputs.items()}
-
-    with torch.inference_mode():
-        output_ids = gen_model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            pad_token_id=gen_tokenizer.pad_token_id,
-            eos_token_id=gen_tokenizer.eos_token_id,
-        )
-
-    generated_ids = output_ids[0][inputs["input_ids"].shape[1]:]
-    return gen_tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
-
-
-def rank_apartments_with_local_rag(user_query: str, apartments: list[dict[str, Any]]) -> list[int]:
-    candidates = retrieve_candidates(user_query, apartments, top_k=RETRIEVE_TOP_K)
-    if not candidates:
-        return [apartment["id"] for apartment in apartments[:FINAL_TOP_K] if apartment.get("id") is not None]
-
-    if USE_GENERATOR:
-        prompt = build_rag_ranking_prompt(user_query, candidates)
-
-        try:
-            raw_response = generate_small_model_response(prompt)
-            top_ids = extract_top_ids(raw_response, [item["apartment"] for item in candidates])
-            if top_ids:
-                return top_ids[:FINAL_TOP_K]
-        except Exception:
-            pass
-
-    fallback_ids = []
-    for item in candidates:
-        apartment_id = item["apartment"].get("id")
-        if apartment_id is not None and apartment_id not in fallback_ids:
-            fallback_ids.append(apartment_id)
-        if len(fallback_ids) == FINAL_TOP_K:
-            break
-    return fallback_ids
+        _INDEX_CACHE = disk_index
+        is_exact = disk_index.get("signature") == current_signature
+        if is_exact or ALLOW_STALE_INDEX:
+            return _INDEX_CACHE, not is_exact
+        return None, False
 
 
 def refresh_apartment_index(apartments: list[dict[str, Any]]) -> dict[str, Any]:
@@ -396,41 +213,186 @@ def refresh_apartment_index(apartments: list[dict[str, Any]]) -> dict[str, Any]:
         return index_data
 
 
-def extract_top_ids(raw_response: str, apartments: list[dict[str, Any]]) -> list[int]:
-    valid_ids = {apartment["id"] for apartment in apartments if apartment.get("id") is not None}
+def get_index_status(apartments: list[dict[str, Any]]) -> dict[str, Any]:
+    index_data, is_stale = _get_cached_index(apartments)
+    return {
+        "cache_path": str(INDEX_CACHE_PATH),
+        "exists": index_data is not None,
+        "stale": bool(is_stale),
+        "signature": index_data.get("signature") if index_data else None,
+        "created_at": index_data.get("created_at") if index_data else None,
+    }
 
-    try:
-        parsed = json.loads(raw_response)
-        values = parsed.get("top_3", [])
-        cleaned = []
-        for value in values:
-            if isinstance(value, int) and value in valid_ids and value not in cleaned:
-                cleaned.append(value)
-        if len(cleaned) >= 3:
-            return cleaned[:3]
-    except Exception:
-        pass
 
-    try:
-        json_match = re.search(r"\{.*\}", raw_response or "", re.DOTALL)
-        if json_match:
-            parsed = json.loads(json_match.group(0))
-            values = parsed.get("top_3", [])
-            cleaned = []
-            for value in values:
-                if isinstance(value, int) and value in valid_ids and value not in cleaned:
-                    cleaned.append(value)
-            if len(cleaned) >= 3:
-                return cleaned[:3]
-    except Exception:
-        pass
+def format_query_for_embedding(query: str) -> str:
+    return query.strip()
 
-    cleaned = []
-    for num in re.findall(r"\d+", raw_response or ""):
-        apartment_id = int(num)
-        if apartment_id in valid_ids and apartment_id not in cleaned:
-            cleaned.append(apartment_id)
-        if len(cleaned) == 3:
-            return cleaned
 
-    return [apartment["id"] for apartment in apartments[:3] if apartment.get("id") is not None]
+def _tokenize(text: str) -> list[str]:
+    return [t for t in re.findall(r"[a-z0-9]+", text.lower()) if t not in STOPWORDS and len(t) > 1]
+
+
+def _parse_budget(query: str) -> tuple[float | None, float | None]:
+    lowered = query.lower()
+    nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", lowered)]
+    if not nums:
+        return None, None
+
+    between = re.search(r"between\s+\$?(\d+(?:\.\d+)?)\s+(?:and|to)\s+\$?(\d+(?:\.\d+)?)", lowered)
+    if between:
+        return float(between.group(1)), float(between.group(2))
+
+    under = re.search(r"(?:under|below|less than|max(?:imum)?|up to)\s+\$?(\d+(?:\.\d+)?)", lowered)
+    if under:
+        return None, float(under.group(1))
+
+    over = re.search(r"(?:over|above|more than|at least|min(?:imum)?)\s+\$?(\d+(?:\.\d+)?)", lowered)
+    if over:
+        return float(over.group(1)), None
+
+    if len(nums) >= 2:
+        return min(nums[0], nums[1]), max(nums[0], nums[1])
+
+    return None, None
+
+
+def _heuristic_score(user_query: str, apartment: dict[str, Any], document: str | None = None) -> float:
+    query = user_query.lower()
+    doc = (document or build_listing_document(apartment)).lower()
+    score = 0.0
+
+    terms = _tokenize(user_query)
+    score += sum(1.0 for term in terms if term in doc)
+
+    bedrooms = apartment.get("bedrooms")
+    bathrooms = apartment.get("bathrooms")
+    pets = apartment.get("pets")
+    furnished = apartment.get("furnished")
+    laundry_in = apartment.get("washer_dryer_in_unit")
+    laundry_shared = apartment.get("washer_dryer_out_unit")
+    sqft = apartment.get("sqft_living")
+    price_min = apartment.get("price_min")
+    price_max = apartment.get("price_max")
+
+    bed_match = re.search(r"(\d+)\s*(?:bed|bedroom)", query)
+    if bed_match and bedrooms is not None:
+        score += 4.0 if int(bed_match.group(1)) == int(bedrooms) else -1.0
+
+    bath_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:bath|bathroom)", query)
+    if bath_match and bathrooms is not None:
+        score += 4.0 if abs(float(bath_match.group(1)) - float(bathrooms)) < 0.01 else -1.0
+
+    if any(word in query for word in ["cat", "cats", "dog", "dogs", "pet", "pets"]):
+        if pets is True:
+            score += 4.0
+        elif pets is False:
+            score -= 3.0
+
+    if "furnished" in query:
+        score += 3.0 if furnished is True else -1.0
+
+    if any(word in query for word in ["laundry", "washer", "dryer", "in-unit", "in unit"]):
+        if laundry_in is True:
+            score += 3.5
+        elif laundry_shared is True:
+            score += 1.0
+
+    if any(word in query for word in ["largest", "biggest", "spacious", "square feet", "sqft"]):
+        if sqft:
+            score += float(sqft) / 1000.0
+
+    budget_min, budget_max = _parse_budget(query)
+    if price_min is not None or price_max is not None:
+        listing_low = float(price_min) if price_min is not None else float(price_max)
+        listing_high = float(price_max) if price_max is not None else float(price_min)
+        if budget_min is not None and listing_high >= budget_min:
+            score += 1.5
+        if budget_max is not None and listing_low <= budget_max:
+            score += 1.5
+        if budget_min is not None and budget_max is not None:
+            if listing_low <= budget_max and listing_high >= budget_min:
+                score += 3.0
+            else:
+                score -= 2.0
+
+    if "cheapest" in query or "least expensive" in query:
+        if price_min is not None:
+            score += max(0.0, 5.0 - float(price_min) / 1000.0)
+
+    if "most expensive" in query or "luxury" in query:
+        if price_max is not None:
+            score += float(price_max) / 1000.0
+
+    return score
+
+
+def _retrieve_from_cached_index(user_query: str, apartments: list[dict[str, Any]], top_k: int) -> list[dict[str, Any]]:
+    index_data, _is_stale = _get_cached_index(apartments)
+    if index_data is None:
+        return []
+
+    embed_model = load_embedding_model()
+    query_embedding = embed_model.encode(
+        [format_query_for_embedding(user_query)],
+        convert_to_numpy=True,
+        normalize_embeddings=True,
+        show_progress_bar=False,
+    )[0]
+
+    scores = index_data["embeddings"] @ query_embedding
+    ranked_indices = sorted(range(len(scores)), key=lambda i: float(scores[i]), reverse=True)
+
+    apartment_map = {apartment.get("id"): apartment for apartment in apartments if apartment.get("id") is not None}
+    results: list[dict[str, Any]] = []
+
+    for idx in ranked_indices:
+        apartment_id = index_data["ids"][idx]
+        apartment = apartment_map.get(apartment_id)
+        if apartment is None:
+            continue
+        results.append(
+            {
+                "score": float(scores[idx]),
+                "apartment": apartment,
+                "document": index_data["docs"][idx],
+            }
+        )
+        if len(results) >= min(top_k, len(apartments)):
+            break
+
+    return results
+
+
+def _retrieve_with_heuristics(user_query: str, apartments: list[dict[str, Any]], top_k: int) -> list[dict[str, Any]]:
+    scored = []
+    for apartment in apartments:
+        document = build_listing_document(apartment)
+        scored.append(
+            {
+                "score": _heuristic_score(user_query, apartment, document),
+                "apartment": apartment,
+                "document": document,
+            }
+        )
+
+    scored.sort(key=lambda item: item["score"], reverse=True)
+    return scored[: min(top_k, len(scored))]
+
+
+def rank_apartments_with_local_rag(user_query: str, apartments: list[dict[str, Any]]) -> list[int]:
+    candidates = _retrieve_from_cached_index(user_query, apartments, top_k=RETRIEVE_TOP_K)
+    if not candidates:
+        candidates = _retrieve_with_heuristics(user_query, apartments, top_k=RETRIEVE_TOP_K)
+
+    top_ids: list[int] = []
+    for item in candidates:
+        apartment_id = item["apartment"].get("id")
+        if apartment_id is not None and apartment_id not in top_ids:
+            top_ids.append(apartment_id)
+        if len(top_ids) >= FINAL_TOP_K:
+            break
+
+    if top_ids:
+        return top_ids
+
+    return [apartment["id"] for apartment in apartments[:FINAL_TOP_K] if apartment.get("id") is not None]
