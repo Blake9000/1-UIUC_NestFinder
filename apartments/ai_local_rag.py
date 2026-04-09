@@ -1,6 +1,11 @@
+from __future__ import annotations
+
 import json
+import pickle
 import re
 import threading
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 _EMBED_MODEL = None
@@ -17,6 +22,36 @@ EMBED_BATCH_SIZE = 8
 RETRIEVE_TOP_K = 8
 FINAL_TOP_K = 3
 MAX_INPUT_TOKENS = 1200
+INDEX_MAX_AGE = timedelta(days=1)
+USE_GENERATOR = True
+
+CACHE_DIR = Path(__file__).resolve().parents[1] / "data"
+CACHE_DIR.mkdir(parents=True, exist_ok=True)
+INDEX_CACHE_PATH = CACHE_DIR / "apartment_embedding_index.pkl"
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        text = str(value).strip()
+        if not text:
+            return None
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _import_local_ml_dependencies():
@@ -37,24 +72,37 @@ def _import_local_ml_dependencies():
     return torch, SentenceTransformer, AutoModelForCausalLM, AutoTokenizer
 
 
-def load_local_rag_models():
-    global _EMBED_MODEL, _GEN_MODEL, _GEN_TOKENIZER
+def load_embedding_model():
+    global _EMBED_MODEL
 
-    if _EMBED_MODEL is not None and _GEN_MODEL is not None and _GEN_TOKENIZER is not None:
-        return _EMBED_MODEL, _GEN_MODEL, _GEN_TOKENIZER
+    if _EMBED_MODEL is not None:
+        return _EMBED_MODEL
 
     with _LOCK:
-        if _EMBED_MODEL is not None and _GEN_MODEL is not None and _GEN_TOKENIZER is not None:
-            return _EMBED_MODEL, _GEN_MODEL, _GEN_TOKENIZER
+        if _EMBED_MODEL is not None:
+            return _EMBED_MODEL
 
-        torch, SentenceTransformer, AutoModelForCausalLM, AutoTokenizer = _import_local_ml_dependencies()
+        _, SentenceTransformer, _, _ = _import_local_ml_dependencies()
+        _EMBED_MODEL = SentenceTransformer(
+            EMBEDDING_MODEL_NAME,
+            trust_remote_code=True,
+            device=DEVICE,
+        )
 
-        if _EMBED_MODEL is None:
-            _EMBED_MODEL = SentenceTransformer(
-                EMBEDDING_MODEL_NAME,
-                trust_remote_code=True,
-                device=DEVICE,
-            )
+    return _EMBED_MODEL
+
+
+def load_generator_model():
+    global _GEN_MODEL, _GEN_TOKENIZER
+
+    if _GEN_MODEL is not None and _GEN_TOKENIZER is not None:
+        return _GEN_MODEL, _GEN_TOKENIZER
+
+    with _LOCK:
+        if _GEN_MODEL is not None and _GEN_TOKENIZER is not None:
+            return _GEN_MODEL, _GEN_TOKENIZER
+
+        torch, _, AutoModelForCausalLM, AutoTokenizer = _import_local_ml_dependencies()
 
         if _GEN_TOKENIZER is None:
             _GEN_TOKENIZER = AutoTokenizer.from_pretrained(GEN_MODEL_NAME)
@@ -67,7 +115,7 @@ def load_local_rag_models():
             _GEN_MODEL.eval()
             torch.set_grad_enabled(False)
 
-    return _EMBED_MODEL, _GEN_MODEL, _GEN_TOKENIZER
+    return _GEN_MODEL, _GEN_TOKENIZER
 
 
 def build_listing_document(apartment: dict[str, Any]) -> str:
@@ -114,27 +162,34 @@ def build_listing_document(apartment: dict[str, Any]) -> str:
     return "\n".join(str(line) for line in feature_lines)
 
 
-def build_index_signature(apartments: list[dict[str, Any]]) -> tuple:
-    signature_rows = []
+def _cache_signature(apartments: list[dict[str, Any]]) -> dict[str, Any]:
+    ids = []
+    newest_scrape: datetime | None = None
+
     for apartment in apartments:
-        signature_rows.append(
-            (
-                apartment.get("id"),
-                apartment.get("price_min"),
-                apartment.get("price_max"),
-                apartment.get("bedrooms"),
-                apartment.get("bathrooms"),
-                apartment.get("sqft_living"),
-                apartment.get("pets"),
-                apartment.get("furnished"),
-                apartment.get("washer_dryer_in_unit"),
-                apartment.get("washer_dryer_out_unit"),
-                apartment.get("housing_type"),
-                apartment.get("internet"),
-                apartment.get("amenities_text"),
-            )
-        )
-    return tuple(signature_rows)
+        apartment_id = apartment.get("id")
+        if apartment_id is not None:
+            ids.append(int(apartment_id))
+        scraped = _parse_datetime(apartment.get("date_scraped"))
+        if scraped and (newest_scrape is None or scraped > newest_scrape):
+            newest_scrape = scraped
+
+    return {
+        "count": len(apartments),
+        "ids": tuple(sorted(ids)),
+        "newest_date_scraped": newest_scrape.isoformat() if newest_scrape else None,
+    }
+
+
+def _cache_is_fresh(cache_data: dict[str, Any], apartments: list[dict[str, Any]]) -> bool:
+    created_at = _parse_datetime(cache_data.get("created_at"))
+    if created_at is None:
+        return False
+
+    if _utcnow() - created_at > INDEX_MAX_AGE:
+        return False
+
+    return cache_data.get("signature") == _cache_signature(apartments)
 
 
 def format_query_for_embedding(query: str) -> str:
@@ -146,15 +201,8 @@ def format_passage_for_embedding(text: str) -> str:
     return text.strip()
 
 
-def build_or_get_index(apartments: list[dict[str, Any]]):
-    global _INDEX_CACHE
-
-    embed_model, _, _ = load_local_rag_models()
-    signature = build_index_signature(apartments)
-
-    if _INDEX_CACHE is not None and _INDEX_CACHE["signature"] == signature:
-        return _INDEX_CACHE
-
+def _build_index_from_apartments(apartments: list[dict[str, Any]]) -> dict[str, Any]:
+    embed_model = load_embedding_model()
     docs = [build_listing_document(apartment) for apartment in apartments]
     ids = [apartment.get("id") for apartment in apartments]
 
@@ -166,19 +214,59 @@ def build_or_get_index(apartments: list[dict[str, Any]]):
         show_progress_bar=False,
     )
 
-    _INDEX_CACHE = {
-        "signature": signature,
+    return {
+        "created_at": _utcnow().isoformat(),
+        "signature": _cache_signature(apartments),
         "ids": ids,
         "docs": docs,
         "embeddings": embeddings,
         "apartments": apartments,
     }
-    return _INDEX_CACHE
+
+
+def _load_disk_index() -> dict[str, Any] | None:
+    if not INDEX_CACHE_PATH.exists():
+        return None
+
+    try:
+        with INDEX_CACHE_PATH.open("rb") as fh:
+            return pickle.load(fh)
+    except Exception:
+        return None
+
+
+def _write_disk_index(index_data: dict[str, Any]) -> None:
+    temp_path = INDEX_CACHE_PATH.with_suffix(".tmp")
+    with temp_path.open("wb") as fh:
+        pickle.dump(index_data, fh, protocol=pickle.HIGHEST_PROTOCOL)
+    temp_path.replace(INDEX_CACHE_PATH)
+
+
+def build_or_get_index(apartments: list[dict[str, Any]]):
+    global _INDEX_CACHE
+
+    signature = _cache_signature(apartments)
+
+    with _LOCK:
+        if _INDEX_CACHE is not None:
+            if _cache_is_fresh(_INDEX_CACHE, apartments):
+                return _INDEX_CACHE
+            _INDEX_CACHE = None
+
+        disk_index = _load_disk_index()
+        if disk_index is not None and _cache_is_fresh(disk_index, apartments):
+            _INDEX_CACHE = disk_index
+            return _INDEX_CACHE
+
+        index_data = _build_index_from_apartments(apartments)
+        _write_disk_index(index_data)
+        _INDEX_CACHE = index_data
+        return _INDEX_CACHE
 
 
 def retrieve_candidates(user_query: str, apartments: list[dict[str, Any]], top_k: int = RETRIEVE_TOP_K) -> list[dict[str, Any]]:
     index_data = build_or_get_index(apartments)
-    embed_model, _, _ = load_local_rag_models()
+    embed_model = load_embedding_model()
 
     query_embedding = embed_model.encode(
         [format_query_for_embedding(user_query)],
@@ -239,7 +327,7 @@ Rules:
 
 def generate_small_model_response(prompt: str, max_new_tokens: int = 64) -> str:
     torch, _, _, _ = _import_local_ml_dependencies()
-    _, gen_model, gen_tokenizer = load_local_rag_models()
+    gen_model, gen_tokenizer = load_generator_model()
 
     messages = [
         {"role": "system", "content": "You rank apartment listings and return strict JSON."},
@@ -278,15 +366,16 @@ def rank_apartments_with_local_rag(user_query: str, apartments: list[dict[str, A
     if not candidates:
         return [apartment["id"] for apartment in apartments[:FINAL_TOP_K] if apartment.get("id") is not None]
 
-    prompt = build_rag_ranking_prompt(user_query, candidates)
+    if USE_GENERATOR:
+        prompt = build_rag_ranking_prompt(user_query, candidates)
 
-    try:
-        raw_response = generate_small_model_response(prompt)
-        top_ids = extract_top_ids(raw_response, [item["apartment"] for item in candidates])
-        if top_ids:
-            return top_ids[:FINAL_TOP_K]
-    except Exception:
-        pass
+        try:
+            raw_response = generate_small_model_response(prompt)
+            top_ids = extract_top_ids(raw_response, [item["apartment"] for item in candidates])
+            if top_ids:
+                return top_ids[:FINAL_TOP_K]
+        except Exception:
+            pass
 
     fallback_ids = []
     for item in candidates:
@@ -296,6 +385,15 @@ def rank_apartments_with_local_rag(user_query: str, apartments: list[dict[str, A
         if len(fallback_ids) == FINAL_TOP_K:
             break
     return fallback_ids
+
+
+def refresh_apartment_index(apartments: list[dict[str, Any]]) -> dict[str, Any]:
+    global _INDEX_CACHE
+    with _LOCK:
+        index_data = _build_index_from_apartments(apartments)
+        _write_disk_index(index_data)
+        _INDEX_CACHE = index_data
+        return index_data
 
 
 def extract_top_ids(raw_response: str, apartments: list[dict[str, Any]]) -> list[int]:
