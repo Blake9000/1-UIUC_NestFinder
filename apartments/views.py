@@ -12,6 +12,7 @@ from apartments.models import Apartment
 from io import BytesIO
 import requests
 from users.models import Favorite
+from .ai_local_rag import rank_apartments_with_local_rag
 
 
 # Create your views here.
@@ -320,8 +321,10 @@ def apartments_favorite_api(request):
 # Ai_llama integration, it's the hugging face model we picked.
 from django.shortcuts import render
 from django.http import JsonResponse
-from .ai_llama import *
+#from .ai_llama import *
 
+#Old apartment chatbot view. Requires good gpu to function
+'''
 def apartment_chatbot(request):
     if request.method == "GET":
         return render(request, "chatbot/chatbot.html")
@@ -346,6 +349,48 @@ def apartment_chatbot(request):
             top_ids = geminiAPI(user_message, apartment_payload)
         else:
             top_ids = rank_apartments_with_llama(user_message, apartment_payload)
+
+        apartment_map = {apartment.id: apartment for apartment in apartments}
+
+        ranked_apartments = []
+        for apartment_id in top_ids:
+            apartment = apartment_map.get(apartment_id)
+            if apartment and apartment not in ranked_apartments:
+                ranked_apartments.append(apartment)
+
+        results = [serialize_apartment_for_frontend(apartment) for apartment in ranked_apartments[:3]]
+
+        return JsonResponse({"results": results})
+
+    except Exception as exc:
+        return JsonResponse({"error": str(exc)}, status=500)
+'''
+
+def apartment_chatbot(request):
+    if request.method == "GET":
+        return render(request, "chatbot/chatbot.html")
+
+    user_message = request.POST.get("message", "").strip()
+    mode = request.POST.get("mode", "local").strip().lower()
+
+    if not user_message:
+        return JsonResponse({"error": "Message is required."}, status=400)
+
+    apartments = list(
+        Apartment.objects.select_related("leasingCompany").all()
+    )
+
+    if not apartments:
+        return JsonResponse({"results": []})
+
+    apartment_payload = [serialize_apartment_for_model(apartment) for apartment in apartments]
+
+    try:
+        if mode == "api":
+            top_ids = geminiAPI(user_message, apartment_payload)
+        else:
+            from .ai_local_rag import rank_apartments_with_local_rag
+            top_ids = rank_apartments_with_local_rag(user_message, apartment_payload)
 
         apartment_map = {apartment.id: apartment for apartment in apartments}
 
