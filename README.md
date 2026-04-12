@@ -58,3 +58,14 @@ Structured Output (Top 3 Listings JSON)
 
       V
 Frontend Display (Chatbot UI)
+
+
+2.3 Rationale:
+
+As stated in the preview section, we chose "vhab10/llama-3-8b-merged-linear" as our large language model. 
+
+Being a medium sized model of 8 billion parameters it had decent accuracy compared to the other models in our analysis, larger or smaller. In the preliminary AI prototyping phase, this model generated fair responses suitable for our three testing prompts, while the others failed or was taking to much processing power to generate. 
+
+At our integration stage, the model successfully output the instructed format with great accuracy. In our earlier analysis, we had a smaller sized model "Qwen2.5-1.5B-Instruct" as an alternative which had good accuracy and faster speed. 
+
+However, we chose the llama model in the end for its consistent good quality and great speed/latency.
