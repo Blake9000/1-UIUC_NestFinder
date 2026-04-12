@@ -38,3 +38,11 @@ Rules are set for the LLM in the final prompt instructing the format to restrict
 | I want a 2-bedroom apartment that has in-unit laundry. | App should return matching apartments. | Returned 3 listings. | Only one of the returned listings is a 2-bedroom apartment, but all of the listings meet the requirement of having in-unit laundry. | Very fast |
 | Find me a place close to Target on Green Street. | App should return matching apartments. | Returned 3 listings. | Bad match. None of them is close to the target on Green St.                                                                         | Very fast |
 | Cheap apartments near the Main Quad. | App should return matching apartments. | Returned 3 listings. | All good match.                                                                                                                     | Very fast |
+
+### 3.3: Failure Analysis
+
+1. Poor location understanding  
+For the input “Find me a place close to Target on Green Street,” none of the returned apartments were actually close to that location. The app may struggle with landmark-based queries.  
+
+2. Incorrect attribute matching  
+For the input “I want the cheapest apartment with parking and internet included,” the app matched the parking requirement well, but did not correctly satisfy the internet requirement. The failure shows that the retrieval accuracy is not high enough.
