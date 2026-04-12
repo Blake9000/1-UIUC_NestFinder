@@ -148,7 +148,24 @@ def build_ranking_prompt(user_query: str, apartments: list[dict]) -> str:
         apartment_lines.append(json.dumps(compact, ensure_ascii=False))
 
     apartment_block = "\n".join(apartment_lines)
-
+    print(f"""
+        Rank the apartments for this request.
+        
+        User request:
+        {user_query}
+        
+        Apartments:
+        {apartment_block}
+        
+        Return only JSON:
+        {{"top_3":[id1,id2,id3]}}
+        
+        Rules:
+        - Exactly 3 IDs
+        - Best to worst
+        - Only use listed IDs
+        - No explanation
+        """.strip())
     return f"""
 Rank the apartments for this request.
 
