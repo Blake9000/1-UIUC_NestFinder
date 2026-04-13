@@ -46,3 +46,47 @@ For the input “Find me a place close to Target on Green Street,” none of the
 
 2. Incorrect attribute matching  
 For the input “I want the cheapest apartment with parking and internet included,” the app matched the parking requirement well, but did not correctly satisfy the internet requirement. The failure shows that the retrieval accuracy is not high enough.
+
+
+### 3.4: Improvement Attempt
+**Prompt improvement**
+
+Prompt to improve: Find me a place close to Target on Green Street.
+
+Reason: The top 3 listings aren't giving apartments that are close to the target or Green St. at all
+
+Improved Prompt: Find the best places near Sixth St. and Green St.
+
+
+**Before:** 
+
+Before Prompt: Find me a place close to Target on Green Street.
+
+Before Output:
+
+Top 3 listings it gave:
+1. 502 E. Stoughton St
+2. 1305 W. Columbia Ave
+3. 202 E Springfield Ave
+
+Overall: not a good match, these listings aren't near the Target at all, somewhat near Green St. but not entirely accurate
+
+**After**
+
+After Prompt: Find the best places near Sixth St. and Green St.
+
+After Output:
+1. 713 S Sixth St
+2. 54 E Chalmers St
+3. 204 E Clark St
+
+Overall: Still not great, but the first listing is dead on and is very close to Target and Green St.
+
+**Why it Helped:**
+This prompt helped because the AI is trained with listing information, since the listings may not have "near Target" as something advertised,
+the AI isn't sure where or what Target (the store) is. Thus, specifying street locations near the Target and Green may give better results.
+I chose to ask for Sixth St because it is the one perpendicular to where Target is, and it did in fact give an apartment on sixth, and one that is close to the target.
+Is it better overall? Not entirely since the other two listings aren't anywhere near what is being asked, but being precise about what the AI is trained on can help find a better result.
+
+
+
