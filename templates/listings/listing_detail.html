@@ -4,8 +4,6 @@
 
 {% block extra_head %}
 <style>
-
-
   .listing-detail-wrap {
     font-family: 'DM Sans', sans-serif;
     background: #f8f7f4;
@@ -14,7 +12,7 @@
   }
 
   .listing-card {
-    max-width: 860px;
+    max-width: 980px;
     margin: 0 auto;
     background: #ffffff;
     border-radius: 16px;
@@ -22,37 +20,142 @@
     overflow: hidden;
   }
 
-  /* ── Image gallery ── */
-  .gallery {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 280px 140px;
-    gap: 3px;
-    background: #e8e6e0;
+  .carousel {
+    position: relative;
+    background: #f0ede6;
+    border-bottom: 1px solid #e8e6e0;
   }
-  .gallery a { display: block; overflow: hidden; }
-  .gallery a:first-child { grid-row: 1 / 3; }
-  .gallery img {
-    width: 100%; height: 100%;
+
+  .carousel-stage {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    min-height: 280px;
+    max-height: 560px;
+    overflow: hidden;
+    background: #f0ede6;
+  }
+
+  .carousel-slide {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+  }
+
+  .carousel-slide.is-active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .carousel-slide img {
+    width: 100%;
+    height: 100%;
     object-fit: cover;
     display: block;
-    transition: transform 0.3s ease;
+    background: #f0ede6;
   }
-  .gallery a:hover img { transform: scale(1.04); }
-  .gallery-placeholder {
-    grid-column: 1 / -1;
-    height: 280px;
+
+  .carousel-placeholder {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f0ede6;
+    min-height: 320px;
     color: #aaa8a0;
-    font-size: 14px;
-    letter-spacing: 0.05em;
+    font-size: 0.95rem;
+    letter-spacing: 0.03em;
   }
 
-  /* ── Main content ── */
-  .listing-body { padding: 2rem 2.25rem; }
+  .carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.85);
+    background: rgba(26, 25, 23, 0.78);
+    color: #fff;
+    font-size: 1.2rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  .carousel-btn:hover {
+    background: rgba(26, 25, 23, 0.92);
+  }
+
+  .carousel-btn.prev { left: 14px; }
+  .carousel-btn.next { right: 14px; }
+
+  .carousel-count {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    z-index: 3;
+    background: rgba(26, 25, 23, 0.78);
+    color: #fff;
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+  }
+
+  .carousel-thumbs {
+    display: flex;
+    gap: 8px;
+    padding: 10px 12px 12px;
+    overflow-x: auto;
+    background: #faf9f6;
+    border-top: 1px solid #ede9e2;
+  }
+
+  .carousel-thumbs::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .carousel-thumbs::-webkit-scrollbar-thumb {
+    background: #d8d3ca;
+    border-radius: 999px;
+  }
+
+  .thumb-btn {
+    border: 1px solid #e2dfd7;
+    padding: 0;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    width: 92px;
+    height: 68px;
+    flex: 0 0 auto;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+
+  .thumb-btn.is-active {
+    border-color: #1a1917;
+    box-shadow: 0 0 0 1px #1a1917 inset;
+  }
+
+  .thumb-btn:hover {
+    border-color: #9e9b94;
+  }
+
+  .thumb-btn img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .listing-body {
+    padding: 2rem 2.25rem;
+  }
 
   .listing-header {
     display: flex;
@@ -62,75 +165,105 @@
     margin-bottom: 1.25rem;
   }
 
+  .listing-title-block {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
   .listing-name {
     font-family: 'DM Serif Display', serif;
-    font-size: 1.75rem;
+    font-size: 1.9rem;
     font-weight: 400;
     color: #1a1917;
     margin: 0 0 0.25rem;
-    line-height: 1.2;
+    line-height: 1.18;
+    overflow-wrap: anywhere;
   }
 
   .listing-address {
-    font-size: 0.9rem;
+    font-size: 0.92rem;
     color: #79776e;
     display: flex;
-    align-items: center;
-    gap: 5px;
+    align-items: flex-start;
+    gap: 6px;
+    overflow-wrap: anywhere;
   }
+
   .listing-address::before {
     content: '';
     display: inline-block;
-    width: 10px; height: 13px;
+    width: 10px;
+    height: 13px;
+    margin-top: 2px;
     background: #79776e;
     clip-path: polygon(50% 0%, 100% 35%, 100% 65%, 50% 100%, 0% 65%, 0% 35%);
     flex-shrink: 0;
   }
 
-  .price-block { text-align: right; flex-shrink: 0; }
+  .price-block {
+    text-align: right;
+    flex: 0 0 auto;
+    max-width: 42%;
+  }
+
   .price-main {
     font-family: 'DM Serif Display', serif;
-    font-size: 1.75rem;
+    font-size: 1.8rem;
     color: #1a1917;
-    line-height: 1;
-    white-space: nowrap;
+    line-height: 1.05;
+    overflow-wrap: anywhere;
   }
-  .price-sub { font-size: 0.78rem; color: #79776e; margin-top: 3px; }
-  .price-raw { font-size: 0.78rem; color: #9e9b94; }
 
-  /* ── Badges ── */
-  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1.5rem; }
+  .price-sub {
+    font-size: 0.8rem;
+    color: #79776e;
+    margin-top: 4px;
+  }
+
+  .price-raw {
+    font-size: 0.8rem;
+    color: #9e9b94;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+  }
+
+  .badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 1.5rem;
+  }
+
   .badge {
     font-size: 0.78rem;
     font-weight: 500;
     padding: 4px 10px;
-    border-radius: 20px;
+    border-radius: 999px;
     border: 1px solid #e2dfd7;
     background: #faf9f6;
     color: #4a4840;
     letter-spacing: 0.01em;
   }
+
   .badge-avail {
     background: #e8f4ec;
     border-color: #b8dfc2;
     color: #2a6e3f;
   }
 
-  /* ── Divider ── */
   .divider {
     height: 1px;
     background: #ede9e2;
     margin: 1.5rem 0;
   }
 
-  /* ── Key facts grid ── */
   .facts-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 1rem;
     margin-bottom: 1.5rem;
   }
-  .fact-item {}
+
   .fact-label {
     font-size: 0.72rem;
     text-transform: uppercase;
@@ -138,28 +271,37 @@
     color: #9e9b94;
     margin-bottom: 4px;
   }
+
   .fact-value {
     font-size: 0.92rem;
     font-weight: 500;
     color: #1a1917;
+    overflow-wrap: anywhere;
   }
-  .fact-value.unknown { color: #b8b5ae; font-weight: 400; }
 
-  /* ── Amenities ── */
+  .fact-value.unknown {
+    color: #b8b5ae;
+    font-weight: 400;
+  }
+
   .amenities-list {
     list-style: none;
-    padding: 0; margin: 0;
+    padding: 0;
+    margin: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 6px 1.5rem;
   }
+
   .amenities-list li {
     font-size: 0.88rem;
     color: #4a4840;
     padding-left: 1.1rem;
     position: relative;
     line-height: 1.5;
+    overflow-wrap: anywhere;
   }
+
   .amenities-list li::before {
     content: '✓';
     position: absolute;
@@ -168,49 +310,60 @@
     font-size: 0.8rem;
   }
 
-  /* ── Meta footer ── */
   .listing-meta {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem 2rem;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     color: #9e9b94;
     margin-bottom: 1.5rem;
   }
-  .listing-meta strong { color: #5a5852; }
 
-  /* ── CTA buttons ── */
-  .cta-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .listing-meta strong {
+    color: #5a5852;
+  }
+
+  .cta-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary-custom,
+  .btn-outline-custom {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: 8px;
+    transition: background 0.2s, border-color 0.2s;
+  }
 
   .btn-primary-custom {
-    display: inline-flex; align-items: center; gap: 6px;
     background: #1a1917;
     color: #fff;
-    text-decoration: none;
-    font-size: 0.88rem;
-    font-weight: 500;
-    padding: 10px 20px;
-    border-radius: 8px;
-    transition: background 0.2s;
-    letter-spacing: 0.01em;
   }
-  .btn-primary-custom:hover { background: #333; color: #fff; }
+
+  .btn-primary-custom:hover {
+    background: #333;
+    color: #fff;
+  }
 
   .btn-outline-custom {
-    display: inline-flex; align-items: center; gap: 6px;
     background: transparent;
     color: #4a4840;
-    text-decoration: none;
-    font-size: 0.88rem;
-    font-weight: 500;
-    padding: 10px 20px;
-    border-radius: 8px;
     border: 1px solid #d4d0c9;
-    transition: border-color 0.2s, background 0.2s;
   }
-  .btn-outline-custom:hover { border-color: #9e9b94; background: #faf9f6; }
 
-  /* Section title */
+  .btn-outline-custom:hover {
+    border-color: #9e9b94;
+    background: #faf9f6;
+    color: #4a4840;
+  }
+
   .section-title {
     font-size: 0.72rem;
     text-transform: uppercase;
@@ -220,12 +373,33 @@
     font-weight: 500;
   }
 
-  @media (max-width: 600px) {
-    .listing-body { padding: 1.25rem; }
-    .listing-header { flex-direction: column; gap: 0.5rem; }
-    .price-block { text-align: left; }
-    .gallery { grid-template-columns: 1fr; grid-template-rows: auto; }
-    .gallery a:first-child { grid-row: auto; }
+  @media (max-width: 760px) {
+    .listing-detail-wrap {
+      padding: 1rem 0.5rem 2rem;
+    }
+
+    .listing-body {
+      padding: 1.25rem;
+    }
+
+    .listing-header {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .price-block {
+      text-align: left;
+      max-width: none;
+    }
+
+    .carousel-stage {
+      min-height: 220px;
+    }
+
+    .thumb-btn {
+      width: 78px;
+      height: 58px;
+    }
   }
 </style>
 {% endblock %}
@@ -235,35 +409,65 @@
   <div class="listing-card">
 
     {% if listing.apartments_images or listing.additional_amenities.image_urls %}
-      <div class="gallery">
-        {% if listing.apartments_images %}
-          <a href="{{ listing.apartments_images }}" target="_blank" rel="noopener">
-            <img src="{{ listing.apartments_images }}" alt="Main apartment photo">
-          </a>
-        {% endif %}
-        {% if listing.additional_amenities.image_urls %}
-          {% for u in listing.additional_amenities.image_urls %}
-            {% if u != listing.apartments_images %}
-              <a href="{{ u }}" target="_blank" rel="noopener">
-                <img src="{{ u }}" alt="Apartment photo">
+      <div class="carousel" id="listing-carousel">
+        <div class="carousel-stage">
+          {% if listing.apartments_images %}
+            <div class="carousel-slide is-active" data-slide>
+              <a href="{{ listing.apartments_images }}" target="_blank" rel="noopener">
+                <img src="{{ listing.apartments_images }}" alt="Apartment photo">
               </a>
-            {% endif %}
-          {% endfor %}
-        {% endif %}
+            </div>
+          {% endif %}
+
+          {% if listing.additional_amenities.image_urls %}
+            {% for u in listing.additional_amenities.image_urls %}
+              {% if u != listing.apartments_images %}
+                <div class="carousel-slide {% if not listing.apartments_images and forloop.first %}is-active{% endif %}" data-slide>
+                  <a href="{{ u }}" target="_blank" rel="noopener">
+                    <img src="{{ u }}" alt="Apartment photo">
+                  </a>
+                </div>
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+
+          <button type="button" class="carousel-btn prev" data-carousel-prev aria-label="Previous photo">‹</button>
+          <button type="button" class="carousel-btn next" data-carousel-next aria-label="Next photo">›</button>
+          <div class="carousel-count" data-carousel-count>1 / 1</div>
+        </div>
+
+        <div class="carousel-thumbs" data-carousel-thumbs>
+          {% if listing.apartments_images %}
+            <button type="button" class="thumb-btn is-active" data-thumb>
+              <img src="{{ listing.apartments_images }}" alt="Apartment thumbnail">
+            </button>
+          {% endif %}
+
+          {% if listing.additional_amenities.image_urls %}
+            {% for u in listing.additional_amenities.image_urls %}
+              {% if u != listing.apartments_images %}
+                <button type="button" class="thumb-btn {% if not listing.apartments_images and forloop.first %}is-active{% endif %}" data-thumb>
+                  <img src="{{ u }}" alt="Apartment thumbnail">
+                </button>
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        </div>
       </div>
     {% else %}
-      <div class="gallery">
-        <div class="gallery-placeholder">No photos available</div>
+      <div class="carousel">
+        <div class="carousel-placeholder">No photos available</div>
       </div>
     {% endif %}
 
     <div class="listing-body">
 
       <div class="listing-header">
-        <div>
+        <div class="listing-title-block">
           <h1 class="listing-name">{{ listing.name }}</h1>
           <div class="listing-address">{{ listing.address }}</div>
         </div>
+
         {% if listing.prices and listing.prices|length %}
           <div class="price-block">
             <div class="price-main">
@@ -284,6 +488,8 @@
             <div class="price-sub">per month</div>
           </div>
         {% endif %}
+      </div>
+
       <div class="badges">
         {% if listing.bedrooms is not None %}
           <span class="badge">{{ listing.bedrooms }} bed{% if listing.bedrooms != 1 %}s{% endif %}</span>
@@ -353,32 +559,33 @@
         </div>
       </div>
 
-        {% if listing.additional_amenities %}
-          <div class="divider"></div>
-          <p class="section-title">Amenities</p>
+      {% if listing.additional_amenities %}
+        <div class="divider"></div>
+        <p class="section-title">Amenities</p>
 
-          {% if listing.additional_amenities.features %}
-            <ul class="amenities-list">
-              {% for feat in listing.additional_amenities.features %}
-                <li>{{ feat }}</li>
-              {% endfor %}
-            </ul>
-          {% elif listing.additional_amenities.subtitle or listing.additional_amenities.property_area or listing.additional_amenities.type_of_property %}
-            <ul class="amenities-list">
-              {% if listing.additional_amenities.subtitle %}
-                <li>{{ listing.additional_amenities.subtitle }}</li>
-              {% endif %}
-              {% if listing.additional_amenities.property_area %}
-                <li>Area: {{ listing.additional_amenities.property_area }}</li>
-              {% endif %}
-              {% if listing.additional_amenities.type_of_property %}
-                <li>Type: {{ listing.additional_amenities.type_of_property }}</li>
-              {% endif %}
-            </ul>
-          {% else %}
-            <div class="fact-value unknown">No amenity details available.</div>
-          {% endif %}
+        {% if listing.additional_amenities.features %}
+          <ul class="amenities-list">
+            {% for feat in listing.additional_amenities.features %}
+              <li>{{ feat }}</li>
+            {% endfor %}
+          </ul>
+        {% elif listing.additional_amenities.subtitle or listing.additional_amenities.property_area or listing.additional_amenities.type_of_property %}
+          <ul class="amenities-list">
+            {% if listing.additional_amenities.subtitle %}
+              <li>{{ listing.additional_amenities.subtitle }}</li>
+            {% endif %}
+            {% if listing.additional_amenities.property_area %}
+              <li>Area: {{ listing.additional_amenities.property_area }}</li>
+            {% endif %}
+            {% if listing.additional_amenities.type_of_property %}
+              <li>Type: {{ listing.additional_amenities.type_of_property }}</li>
+            {% endif %}
+          </ul>
+        {% else %}
+          <div class="fact-value unknown">No amenity details available.</div>
         {% endif %}
+      {% endif %}
+
       <div class="divider"></div>
 
       <div class="listing-meta">
@@ -396,7 +603,7 @@
       <div class="cta-row">
         {% if listing.apartments_url %}
           <a href="{{ listing.apartments_url }}" target="_blank" rel="noopener" class="btn-primary-custom">
-            View listing &rarr;
+            Open original listing &rarr;
           </a>
         {% endif %}
         {% if listing.leasingCompany and listing.leasingCompany.url %}
@@ -404,9 +611,81 @@
             Leasing company
           </a>
         {% endif %}
+        <a href="{% url 'listing' %}" class="btn-outline-custom">
+          Back to listings
+        </a>
       </div>
 
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const carousel = document.getElementById('listing-carousel');
+    if (!carousel) return;
+
+    const slides = Array.from(carousel.querySelectorAll('[data-slide]'));
+    const thumbs = Array.from(carousel.querySelectorAll('[data-thumb]'));
+    const prevBtn = carousel.querySelector('[data-carousel-prev]');
+    const nextBtn = carousel.querySelector('[data-carousel-next]');
+    const countEl = carousel.querySelector('[data-carousel-count]');
+
+    if (!slides.length) return;
+
+    let index = Math.max(0, slides.findIndex(slide => slide.classList.contains('is-active')));
+    if (index === -1) index = 0;
+
+    function render() {
+      slides.forEach((slide, i) => {
+        slide.classList.toggle('is-active', i === index);
+      });
+
+      thumbs.forEach((thumb, i) => {
+        thumb.classList.toggle('is-active', i === index);
+      });
+
+      if (countEl) {
+        countEl.textContent = `${index + 1} / ${slides.length}`;
+      }
+
+      const multiple = slides.length > 1;
+      if (prevBtn) prevBtn.style.display = multiple ? 'inline-flex' : 'none';
+      if (nextBtn) nextBtn.style.display = multiple ? 'inline-flex' : 'none';
+      if (countEl) countEl.style.display = multiple ? 'block' : 'none';
+
+      const thumbsWrap = carousel.querySelector('[data-carousel-thumbs]');
+      if (thumbsWrap) {
+        thumbsWrap.style.display = thumbs.length > 1 ? 'flex' : 'none';
+      }
+    }
+
+    function goTo(newIndex) {
+      index = (newIndex + slides.length) % slides.length;
+      render();
+    }
+
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => goTo(index - 1));
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => goTo(index + 1));
+    }
+
+    thumbs.forEach((thumb, i) => {
+      thumb.addEventListener('click', () => goTo(i));
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (!carousel.offsetParent) return;
+      if (event.key === 'ArrowLeft') goTo(index - 1);
+      if (event.key === 'ArrowRight') goTo(index + 1);
+    });
+
+    render();
+  })();
+</script>
 {% endblock %}
