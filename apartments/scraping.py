@@ -392,6 +392,12 @@ class GreenStreetPropertiesSpider(scrapy.Spider):
                 "prices_structured": payload.get("prices"),
                 "fplans": fplans,
                 "photos": payload.get("photos"),
+                "latitude": payload.get("latitude"),
+                "longitude": payload.get("longitude"),
+                "zoom": payload.get("zoom"),
+                "city": payload.get("city"),
+                "state": payload.get("state"),
+                "zip": payload.get("zip"),
             }
             record = ApartmentRecord(
                 leasing_company_name="Green Street Realty",
