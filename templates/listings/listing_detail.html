@@ -267,11 +267,12 @@
         {% if listing.prices and listing.prices|length %}
           <div class="price-block">
             <div class="price-main">
-                {% if listing.prices|length == 1 %}
-                  ${{ listing.prices.0 }}
-                {% else %}
-                  ${{ listing.prices|min }}&ndash;${{ listing.prices|max }}
-                {% endif %}            </div>
+              {% if listing.prices|length == 1 %}
+                ${{ listing.prices.0|floatformat:0 }}
+              {% else %}
+                ${{ listing.prices|first|floatformat:0 }}&ndash;${{ listing.prices|last|floatformat:0 }}
+              {% endif %}
+            </div>
             <div class="price-sub">per month</div>
             {% if listing.additional_amenities.price_raw %}
               <div class="price-raw">{{ listing.additional_amenities.price_raw }}</div>
@@ -283,8 +284,6 @@
             <div class="price-sub">per month</div>
           </div>
         {% endif %}
-      </div>
-
       <div class="badges">
         {% if listing.bedrooms is not None %}
           <span class="badge">{{ listing.bedrooms }} bed{% if listing.bedrooms != 1 %}s{% endif %}</span>
