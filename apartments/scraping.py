@@ -265,6 +265,12 @@ def build_price_raw(payload: Dict[str, Any], parsed_prices: Optional[List[float]
 
     return None
 
+def build_greenst_image_url(img_id: Any, size: int = 1800) -> Optional[str]:
+    if img_id in (None, ""):
+        return None
+    return f"{GREENST_BASE_URL}/image/{img_id}/{size}"
+
+
 def extract_image_urls(payload: Dict[str, Any]) -> List[str]:
     urls: List[str] = []
 
@@ -275,7 +281,9 @@ def extract_image_urls(payload: Dict[str, Any]) -> List[str]:
 
         img_id = photo.get("img")
         if img_id:
-            urls.append(f"{GREENST_BASE_URL}/img/{img_id}")
+            full_url = build_greenst_image_url(img_id, 1800)
+            if full_url:
+                urls.append(full_url)
 
         url = photo.get("url") or photo.get("src")
         if url:
@@ -291,6 +299,7 @@ def extract_image_urls(payload: Dict[str, Any]) -> List[str]:
             deduped.append(u)
 
     return deduped
+
 
 class GreenStreetPropertiesSpider(scrapy.Spider):
     name = "greenst_properties"
@@ -345,6 +354,12 @@ class GreenStreetPropertiesSpider(scrapy.Spider):
             price_raw = build_price_raw(payload, prices)
             flags = derive_flags_from_text(payload)
             image_urls = extract_image_urls(payload)
+
+            if not image_urls and payload.get("img"):
+                fallback = build_greenst_image_url(payload.get("img"), 1800)
+                if fallback:
+                    image_urls = [fallback]
+
             primary_image = image_urls[0] if image_urls else None
 
             features: List[str] = []
