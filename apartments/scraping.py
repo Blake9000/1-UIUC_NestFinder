@@ -215,6 +215,56 @@ def derive_flags_from_text(payload: Dict[str, Any]) -> Dict[str, Any]:
         "internet": internet,
     }
 
+def build_price_raw(payload: Dict[str, Any], parsed_prices: Optional[List[float]]) -> Optional[str]:
+    prices_structured = payload.get("prices") or {}
+
+    bedlow = prices_structured.get("bedlow")
+    bedhigh = prices_structured.get("bedhigh")
+    totlow = prices_structured.get("totlow")
+    tothigh = prices_structured.get("tothigh")
+
+    def clean_num(v: Any) -> Optional[str]:
+        if v in (None, ""):
+            return None
+        return str(v).strip()
+
+    bedlow = clean_num(bedlow)
+    bedhigh = clean_num(bedhigh)
+    totlow = clean_num(totlow)
+    tothigh = clean_num(tothigh)
+
+    parts: List[str] = []
+
+    if bedlow and bedhigh:
+        if bedlow == bedhigh:
+            parts.append(f"${bedlow}/bed")
+        else:
+            parts.append(f"${bedlow}-${bedhigh}/bed")
+    elif bedlow:
+        parts.append(f"${bedlow}/bed")
+    elif bedhigh:
+        parts.append(f"${bedhigh}/bed")
+
+    if totlow and tothigh:
+        if totlow == tothigh:
+            parts.append(f"${totlow} total")
+        else:
+            parts.append(f"${totlow}-${tothigh} total")
+    elif totlow:
+        parts.append(f"${totlow} total")
+    elif tothigh:
+        parts.append(f"${tothigh} total")
+
+    if parts:
+        return " | ".join(parts)
+
+    if parsed_prices:
+        if len(parsed_prices) == 1:
+            return f"${parsed_prices[0]:.0f}"
+        return f"${min(parsed_prices):.0f}-${max(parsed_prices):.0f}"
+
+    return None
+
 def extract_image_urls(payload: Dict[str, Any]) -> List[str]:
     urls: List[str] = []
 
@@ -225,9 +275,7 @@ def extract_image_urls(payload: Dict[str, Any]) -> List[str]:
 
         img_id = photo.get("img")
         if img_id:
-            # Current site exposes image ids, not guaranteed final URLs.
-            # Keep ids in additional_amenities and let apartments_images stay profile URL fallback if needed.
-            continue
+            urls.append(f"{GREENST_BASE_URL}/img/{img_id}")
 
         url = photo.get("url") or photo.get("src")
         if url:
@@ -294,30 +342,42 @@ class GreenStreetPropertiesSpider(scrapy.Spider):
             fplans = payload.get("fplans") or []
             prices, availability_raw, bedrooms, bathrooms, sqft = extract_floorplan_summary(fplans)
 
-            price_raw = None
-            if payload.get("prices"):
-                price_raw = json.dumps(payload.get("prices"), ensure_ascii=False)
-            elif prices:
-                price_raw = ", ".join(str(p) for p in prices)
-
+            price_raw = build_price_raw(payload, prices)
             flags = derive_flags_from_text(payload)
             image_urls = extract_image_urls(payload)
             primary_image = image_urls[0] if image_urls else None
 
+            features: List[str] = []
+
+            subtitle = clean_text(payload.get("subtitle"))
+            if subtitle:
+                features.append(subtitle)
+
+            property_area = clean_text(payload.get("property_area"))
+            if property_area:
+                features.append(f"Area: {property_area}")
+
+            property_type = clean_text(payload.get("type_of_property"))
+            if property_type:
+                features.append(f"Type: {property_type}")
+
+            if payload.get("roommate_match") == "1":
+                features.append("Roommate match available")
+
             additional = {
+                "features": features,
                 "source_page": response.url,
                 "greenstreet_id": payload.get("id"),
-                "subtitle": payload.get("subtitle"),
+                "subtitle": subtitle,
                 "slug": payload.get("slug"),
-                "property_area": payload.get("property_area"),
-                "type_of_property": payload.get("type_of_property"),
+                "property_area": property_area,
+                "type_of_property": property_type,
                 "featured": payload.get("featured"),
                 "roommate_match": payload.get("roommate_match"),
                 "prices_structured": payload.get("prices"),
                 "fplans": fplans,
                 "photos": payload.get("photos"),
             }
-
             record = ApartmentRecord(
                 leasing_company_name="Green Street Realty",
                 leasing_company_url=GREENST_BASE_URL,

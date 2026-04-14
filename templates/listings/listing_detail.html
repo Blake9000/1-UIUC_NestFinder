@@ -267,12 +267,11 @@
         {% if listing.prices and listing.prices|length %}
           <div class="price-block">
             <div class="price-main">
-              {% if listing.prices|length == 1 %}
-                ${{ listing.prices.0|floatformat:0 }}
-              {% else %}
-                ${{ listing.prices|first|floatformat:0 }}&ndash;${{ listing.prices|last|floatformat:0 }}
-              {% endif %}
-            </div>
+                {% if listing.prices|length == 1 %}
+                  ${{ listing.prices.0 }}
+                {% else %}
+                  ${{ listing.prices|min }}&ndash;${{ listing.prices|max }}
+                {% endif %}            </div>
             <div class="price-sub">per month</div>
             {% if listing.additional_amenities.price_raw %}
               <div class="price-raw">{{ listing.additional_amenities.price_raw }}</div>
@@ -303,7 +302,7 @@
           <span class="badge">{{ listing.housing_type }}</span>
         {% endif %}
         {% if listing.additional_amenities.availability_raw %}
-          <span class="badge badge-avail">Available {{ listing.additional_amenities.availability_raw }}</span>
+          <span class="badge badge-avail">{{ listing.additional_amenities.availability_raw }}</span>
         {% endif %}
       </div>
 
@@ -355,20 +354,32 @@
         </div>
       </div>
 
-      {% if listing.additional_amenities %}
-        <div class="divider"></div>
-        <p class="section-title">Amenities</p>
-        {% if listing.additional_amenities.features %}
-          <ul class="amenities-list">
-            {% for feat in listing.additional_amenities.features %}
-              <li>{{ feat }}</li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <pre style="font-size:0.82rem; color:#79776e; white-space: pre-wrap;">{{ listing.additional_amenities }}</pre>
-        {% endif %}
-      {% endif %}
+        {% if listing.additional_amenities %}
+          <div class="divider"></div>
+          <p class="section-title">Amenities</p>
 
+          {% if listing.additional_amenities.features %}
+            <ul class="amenities-list">
+              {% for feat in listing.additional_amenities.features %}
+                <li>{{ feat }}</li>
+              {% endfor %}
+            </ul>
+          {% elif listing.additional_amenities.subtitle or listing.additional_amenities.property_area or listing.additional_amenities.type_of_property %}
+            <ul class="amenities-list">
+              {% if listing.additional_amenities.subtitle %}
+                <li>{{ listing.additional_amenities.subtitle }}</li>
+              {% endif %}
+              {% if listing.additional_amenities.property_area %}
+                <li>Area: {{ listing.additional_amenities.property_area }}</li>
+              {% endif %}
+              {% if listing.additional_amenities.type_of_property %}
+                <li>Type: {{ listing.additional_amenities.type_of_property }}</li>
+              {% endif %}
+            </ul>
+          {% else %}
+            <div class="fact-value unknown">No amenity details available.</div>
+          {% endif %}
+        {% endif %}
       <div class="divider"></div>
 
       <div class="listing-meta">
