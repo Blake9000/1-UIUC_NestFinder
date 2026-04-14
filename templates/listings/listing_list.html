@@ -51,7 +51,7 @@
   /* ── Body split ── */
   .listings-body {
     display: grid;
-    grid-template-columns: 25% 1fr;
+    grid-template-columns: minmax(760px, 55vw) minmax(420px, 1fr);
     flex: 1;
     overflow: hidden;
     position: relative;
@@ -59,10 +59,10 @@
 
   /* ── Sidebar ── */
   .listings-sidebar {
-    width: auto;
+    width: 25%;
     min-width: 0;
     overflow-y: auto;
-    padding: 1rem;
+    padding: 1.5rem;
     border-right: 1px solid #e8e6e0;
     background: #faf9f6;
   }
@@ -83,11 +83,11 @@
 
   .listing-card-inner {
     display: flex;
-    min-height: 110px;
+    min-height: 220px;
   }
   .card-image-wrap {
-    width: 120px;
-    min-height: 110px;
+    width: 300px;
+    min-height: 220px;
     flex-shrink: 0;
     overflow: hidden;
   }
@@ -99,14 +99,14 @@
   }
   .card-content {
     flex: 1;
-    padding: 0.85rem 0.95rem;
+    padding: 1.2rem 1.25rem;
     min-width: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
   }
   .card-title {
-    font-size: 1rem;
+    font-size: 1.35rem;
     font-weight: 600;
     color: #1a1917;
     margin: 0 0 4px;
@@ -116,7 +116,7 @@
     padding-right: 28px;
   }
   .card-address {
-    font-size: 0.82rem;
+    font-size: 1.02rem;
     color: #9e9b94;
     margin-bottom: 8px;
     white-space: nowrap;
@@ -124,20 +124,16 @@
     text-overflow: ellipsis;
   }
   .card-price {
-    font-size: 0.95rem;
+    font-size: 1.2rem;
     font-weight: 600;
     color: #1a1917;
     margin-bottom: 8px;
   }
   .card-price.unknown { color: #b8b5ae; font-weight: 400; font-size: 0.8rem; }
-  .card-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
+  .card-badges { display: flex; flex-wrap: wrap; gap: 6px; }
   .card-badge {
-    font-size: 0.7rem;
-    padding: 3px 7px;
+    font-size: 0.8rem;
+    padding: 4px 9px;
     border-radius: 20px;
     background: #f0ede6;
     color: #6a6760;
@@ -163,7 +159,7 @@
 
   /* ── Map panel ── */
   .map-panel {
-    min-width: 360px;
+    min-width: 320px;
     position: relative;
   }
   #map { width: 100%; height: 100%; }
@@ -265,15 +261,7 @@
   /* Mobile */
   @media (max-width: 768px) {
     .listings-body { display: block; overflow: visible; }
-    .listings-sidebar {
-      width: 100%;
-      min-width: 0;
-      border-right: none;
-      border-bottom: 1px solid #e8e6e0;
-      max-height: 52vh;
-      overflow-y: auto;
-      padding: 0.9rem;
-    }
+    .listings-sidebar { width: 100%; min-width: 0; border-right: none; border-bottom: 1px solid #e8e6e0; max-height: 52vh; overflow-y: auto; padding: 0.9rem; }
     .map-panel { height: 55vh; flex: none; }
     .listings-page { height: auto; overflow: visible; }
     .detail-panel { width: 100%; height: 70%; top: auto; bottom: 0; right: 0; transform: translateY(100%); border-left: none; border-top: 1px solid #e8e6e0; }
@@ -438,9 +426,52 @@
   window.addEventListener('resize', () => map.invalidateSize());
 
   // ── Marker icon factory ──
-  function makeIcon(price, active) {
+  function makeIcon(price, active, zoom = map.getZoom()) {
     const bg = active ? '#c8501a' : '#1a1917';
     const label = price || '—';
+
+    if (zoom <= 12) {
+      const html = `
+        <div style="
+          width:12px;
+          height:12px;
+          border-radius:50%;
+          background:${bg};
+          border:2px solid #fff;
+          box-shadow:0 2px 6px rgba(0,0,0,.22);
+        "></div>
+      `;
+      return L.divIcon({
+        html,
+        className: '',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      });
+    }
+
+    if (zoom <= 14) {
+      const html = `
+        <div style="position:relative;display:inline-block;">
+          <div style="
+            background:${bg};
+            color:#fff;
+            font-family:sans-serif;
+            font-size:9px;
+            font-weight:600;
+            padding:2px 6px;
+            border-radius:999px;
+            white-space:nowrap;
+            box-shadow:0 2px 6px rgba(0,0,0,.22);
+          ">${label}</div>
+        </div>
+      `;
+      return L.divIcon({
+        html,
+        className: '',
+        iconAnchor: [20, 12],
+      });
+    }
+
     const html = `
       <div style="position:relative;display:inline-block;">
         <div style="background:${bg};color:#fff;font-family:sans-serif;font-size:11px;
@@ -466,12 +497,26 @@
     const lng = parseFloat(rawLng);
     console.log('listing coords', id, card.dataset.lat, card.dataset.lng);
     if (!isNaN(lat) && !isNaN(lng)) {
-      const marker = L.marker([lat, lng], { icon: makeIcon(card.dataset.price, false) }).addTo(map);
+      const marker = L.marker([lat, lng], {
+        icon: makeIcon(card.dataset.price, false, map.getZoom())
+      }).addTo(map);
       marker.bindPopup(`<strong>${esc(card.dataset.name)}</strong><br>${esc(card.dataset.price || 'Price not listed')}`);
       marker.on('click', () => selectListing(card, true));
       markers[id] = marker;
     }
   });
+
+  function refreshMarkerIcons() {
+    const zoom = map.getZoom();
+
+    cards.forEach(card => {
+      const id = card.dataset.id;
+      if (!markers[id]) return;
+
+      const isActive = activeId === id;
+      markers[id].setIcon(makeIcon(card.dataset.price, isActive, zoom));
+    });
+  }
 
   // Fit bounds to all markers
   const allMarkers = Object.values(markers);
@@ -485,6 +530,8 @@
     }
   }
 
+  map.on('zoomend', refreshMarkerIcons);
+
   // ── Select listing ──
   function selectListing(card, fromMarker) {
     const id = card.dataset.id;
@@ -493,13 +540,13 @@
     if (activeId && activeId !== id) {
       const prev = document.getElementById('card-' + activeId);
       if (prev) prev.classList.remove('active');
-      if (markers[activeId]) markers[activeId].setIcon(makeIcon(prev ? prev.dataset.price : '', false));
+      if (markers[activeId]) markers[activeId].setIcon(makeIcon(prev ? prev.dataset.price : '', false, map.getZoom()));
     }
 
     // Toggle off if same card clicked again
     if (activeId === id) {
       card.classList.remove('active');
-      if (markers[id]) markers[id].setIcon(makeIcon(card.dataset.price, false));
+      if (markers[id]) markers[id].setIcon(makeIcon(card.dataset.price, false, map.getZoom()));
       closeDetailPanel();
       activeId = null;
       return;
@@ -510,7 +557,7 @@
 
     // Highlight marker and fly to it zoomed in
     if (markers[id]) {
-      markers[id].setIcon(makeIcon(card.dataset.price, true));
+      markers[id].setIcon(makeIcon(card.dataset.price, true, map.getZoom()));
       map.flyTo(markers[id].getLatLng(), 17, { duration: 0.8 });
     }
 
@@ -579,7 +626,7 @@
     if (activeId) {
       const card = document.getElementById('card-' + activeId);
       if (card) card.classList.remove('active');
-      if (markers[activeId]) markers[activeId].setIcon(makeIcon(card ? card.dataset.price : '', false));
+      if (markers[activeId]) markers[activeId].setIcon(makeIcon(card ? card.dataset.price : '', false, map.getZoom()));
       activeId = null;
     }
   }
