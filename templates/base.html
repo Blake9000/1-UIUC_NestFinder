@@ -159,11 +159,14 @@
       </button>
 
       <ul class="nav-links" id="nav-links">
-        <li><a href="{% url 'listing' %}">Listings</a></li>
-        <li><a href="{% url 'favorites' %}">Favorites</a></li>
-        <li><a href="{% url 'apartment_chatbot' %}">Chatbot</a></li>
-        <li><a href="{% url 'about' %}">About</a></li>
-      </ul>
+      <li><a href="{% url 'listing' %}">Listings</a></li>
+      <li><a href="{% url 'favorites' %}">Favorites</a></li>
+      <li><a href="{% url 'apartment_chatbot' %}">Chatbot</a></li>
+      {% if user.is_superuser %}
+        <li><a href="{% url 'analytics' %}">Analytics</a></li>
+      {% endif %}
+      <li><a href="{% url 'about' %}">About</a></li>
+    </ul>
 
       <div class="nav-auth" id="nav-auth">
         {% if user.is_authenticated %}

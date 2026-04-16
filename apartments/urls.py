@@ -17,4 +17,5 @@ urlpatterns = [
      path("favorites/api/allfavorite/", apartments_favorite_api, name="favorites_api"),
      #path("admin/scraping/", admin.site.admin_view(scraping_admin_view), name="admin_scraping"),
      path("chatbot/", apartment_chatbot, name="apartment_chatbot"),
+     path("analytics/", analytics_view, name="analytics"),
 ]

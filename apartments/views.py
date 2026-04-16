@@ -16,7 +16,7 @@ from io import BytesIO
 import requests
 from users.models import Favorite
 from .ai_local_rag import rank_apartments_with_local_rag
-
+from django.core.exceptions import PermissionDenied
 
 # Create your views here.
 
@@ -689,3 +689,10 @@ def flatten_additional_amenities(data):
                 parts.append(f"{pretty_key}: {value_text}")
 
     return " | ".join(parts)
+
+@login_required
+def analytics_view(request):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+
+    return render(request, "admin/analytics.html")
