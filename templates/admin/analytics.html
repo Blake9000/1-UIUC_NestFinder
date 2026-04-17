@@ -261,6 +261,92 @@
     return node ? JSON.parse(node.textContent) : [];
   };
 
+  const valueLabelPlugin = {
+    id: 'valueLabelPlugin',
+    afterDatasetsDraw(chart, args, pluginOptions) {
+      const { ctx } = chart;
+      const formatValue = pluginOptions?.formatValue || ((value) => value);
+      const indexAxis = chart.options?.indexAxis || 'x';
+
+      ctx.save();
+      ctx.font = '600 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.fillStyle = '#4a4840';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+
+      chart.data.datasets.forEach((dataset, datasetIndex) => {
+        const meta = chart.getDatasetMeta(datasetIndex);
+        if (meta.hidden) return;
+
+        meta.data.forEach((element, index) => {
+          const rawValue = dataset.data[index];
+          if (rawValue === null || rawValue === undefined) return;
+
+          const label = formatValue(rawValue, dataset.label);
+          const position = element.tooltipPosition();
+
+          if (indexAxis === 'y') {
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, position.x + 8, position.y);
+          } else {
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(label, position.x, position.y - 8);
+          }
+        });
+      });
+
+      ctx.restore();
+    }
+  };
+
+  const buildMultiSeriesLatencyChart = (canvasId, rawPoints) => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !rawPoints.length) return null;
+
+    const labels = rawPoints.map(item => item.label);
+    const ragData = rawPoints.map(item => item.series === 'RAG' ? item.latency_ms : null);
+    const apiData = rawPoints.map(item => item.series === 'API' ? item.latency_ms : null);
+
+    return new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'RAG latency (ms)',
+            data: ragData,
+            tension: 0.25,
+            fill: false,
+            spanGaps: false,
+          },
+          {
+            label: 'API latency (ms)',
+            data: apiData,
+            tension: 0.25,
+            fill: false,
+            spanGaps: false,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        plugins: {
+          legend: { display: true }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  };
+
   const buildLineChart = (canvasId, dataPoints, labelText) => {
     const canvas = document.getElementById(canvasId);
     if (!canvas || !dataPoints.length) return null;
@@ -289,7 +375,7 @@
     });
   };
 
-  const buildBarChart = (canvasId, labels, values, datasetLabel, indexAxis = 'x') => {
+  const buildBarChart = (canvasId, labels, values, datasetLabel, indexAxis = 'x', formatter = null) => {
     const canvas = document.getElementById(canvasId);
     if (!canvas || !labels.length) return null;
 
@@ -306,13 +392,20 @@
         indexAxis: indexAxis,
         responsive: true,
         maintainAspectRatio: false,
+        layout: {
+          padding: indexAxis === 'y' ? { right: 48 } : { top: 24 }
+        },
         plugins: {
-          legend: { display: true }
+          legend: { display: true },
+          valueLabelPlugin: {
+            formatValue: formatter || ((value) => value)
+          }
         },
         scales: {
           y: { beginAtZero: true }
         }
-      }
+      },
+      plugins: [valueLabelPlugin]
     });
   };
 
@@ -325,11 +418,7 @@
   const favoriteUsageWeekly = parseScriptData('favorite-usage-weekly');
 
   if (latencySeries.length) {
-    buildLineChart(
-      'latencyConsistencyChart',
-      latencySeries.map(item => ({ label: item.label, value: item.latency_ms })),
-      'Latency (ms)'
-    );
+    buildMultiSeriesLatencyChart('latencyConsistencyChart', latencySeries);
   }
 
   if (modelLatencyData.length) {
@@ -337,7 +426,9 @@
       'modelLatencyChart',
       modelLatencyData.map(item => item.label),
       modelLatencyData.map(item => item.avg_latency_ms),
-      'Average latency (ms)'
+      'Average latency (ms)',
+      'x',
+      (value) => `${value} ms`
     );
   }
 
@@ -347,7 +438,8 @@
       commonQueriesData.map(item => item.label),
       commonQueriesData.map(item => item.count),
       'Query count',
-      'y'
+      'y',
+      (value) => `${value}`
     );
   }
 

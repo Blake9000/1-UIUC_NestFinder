@@ -807,8 +807,9 @@ def analytics_view(request):
 
     ai_latency_series = [
         {
-            "label": log.created_at.strftime("%Y-%m-%d %H:%M"),
+            "label": log.created_at.strftime("%Y-%m-%d %H:%M:%S"),
             "latency_ms": log.latency_ms,
+            "series": "API" if (log.mode or "").lower() == "api" else "RAG",
         }
         for log in ai_logs
     ]
