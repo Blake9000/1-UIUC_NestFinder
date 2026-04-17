@@ -1,44 +1,43 @@
+import csv
 import json
 import re
-from collections import Counter, defaultdict
-from datetime import datetime, timedelta
-from difflib import SequenceMatcher
-from time import perf_counter
+import time
+from datetime import datetime
 
+import requests
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Avg, Q
-from django.db.models.aggregates import Count
-from django.db.models.functions import TruncDate
-from django.http import HttpResponse
-from django.shortcuts import redirect
-from django.views.generic import ListView
-from django.shortcuts import render, get_object_or_404
-from django.views import View
-from apartments.models import AIRequestLog, Apartment, FavoriteActionLog
-from io import BytesIO
-import requests
-from users.models import Favorite
 from django.core.exceptions import PermissionDenied
+from django.db.models import Avg, Count, Q
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views import View
+from django.views.generic import ListView
+from google import genai
+from google.genai import types
 
-# Create your views here.
+from NestFinder.secrets_environment import env
+from apartments.models import AIRequestLog, Apartment, FavoriteActionLog
+from users.models import Favorite
+from .ai_local_rag import rank_apartments_with_local_rag
+
 
 class ListingView(ListView):
     model = Apartment
-    context_object_name = 'listings'
-    template_name = 'listings/listing_list.html'
+    context_object_name = "listings"
+    template_name = "listings/listing_list.html"
 
     def get_queryset(self):
-        q = self.request.GET.get('q') or self.request.POST.get('q')
+        q = self.request.GET.get("q") or self.request.POST.get("q")
         qs = Apartment.objects.all()
 
         if q:
             qs = qs.filter(
-                Q(name__icontains=q) |
-                Q(address__icontains=q) |
-                Q(floors__icontains=q) |
-                Q(leasingCompany__name__icontains=q) |
-                Q(bedrooms__icontains=q)
+                Q(name__icontains=q)
+                | Q(address__icontains=q)
+                | Q(floors__icontains=q)
+                | Q(leasingCompany__name__icontains=q)
+                | Q(bedrooms__icontains=q)
             )
         return qs
 
@@ -46,253 +45,182 @@ class ListingView(ListView):
         ctx = super().get_context_data(**kwargs)
 
         base_qs = self.get_queryset()
-        q = self.request.GET.get('q') or self.request.POST.get('q')
+        q = self.request.GET.get("q") or self.request.POST.get("q")
 
-        ctx['q']=q
-        ctx['total'] = base_qs.count()
-        ctx['num_leasing'] = base_qs.values('leasingCompany__name').annotate(total=Count('leasingCompany')).count()
+        ctx["q"] = q
+        ctx["total"] = base_qs.count()
+        ctx["num_leasing"] = base_qs.values("leasingCompany__name").annotate(total=Count("leasingCompany")).count()
 
         if self.request.user.is_authenticated:
-            ctx['favorite_ids'] = set(
-                Favorite.objects.filter(
-                    user=self.request.user,
-                    apartment__isnull=False,
-                ).values_list('apartment__id', flat=True)
+            ctx["favorite_ids"] = set(
+                Favorite.objects.filter(user=self.request.user, apartment__isnull=False).values_list(
+                    "apartment__id", flat=True
+                )
             )
         else:
-            ctx['favorite_ids'] = set()
+            ctx["favorite_ids"] = set()
         return ctx
 
     def post(self, request, *args, **kwargs):
         return self.get(request, *args, **kwargs)
 
 
-
 class FavoritesView(LoginRequiredMixin, ListView):
-    context_object_name = 'listings'
-    template_name = 'users/favorites.html'
+    context_object_name = "listings"
+    template_name = "users/favorites.html"
 
     def get_queryset(self):
-        q = self.request.GET.get('q') or self.request.POST.get('q')
-        qs = Apartment.objects.filter(
-            apartment_favorites__user=self.request.user
-        )
+        q = self.request.GET.get("q") or self.request.POST.get("q")
+        qs = Apartment.objects.filter(apartment_favorites__user=self.request.user)
 
         if q:
             qs = qs.filter(
-                Q(name__icontains=q) |
-                Q(address__icontains=q) |
-                Q(floors__icontains=q) |
-                Q(leasingCompany__name__icontains=q) |
-                Q(bedrooms__icontains=q)
+                Q(name__icontains=q)
+                | Q(address__icontains=q)
+                | Q(floors__icontains=q)
+                | Q(leasingCompany__name__icontains=q)
+                | Q(bedrooms__icontains=q)
             )
         return qs
 
 
 class ListingDetailView(View):
-    template_name = 'listings/listing_detail.html'
+    template_name = "listings/listing_detail.html"
 
     def get(self, request, pk):
         listing = get_object_or_404(Apartment, pk=pk)
-
-        context = {
-            'listing': listing
-        }
-
+        context = {"listing": listing}
         return render(request, self.template_name, context)
 
+
 class ApartmentsAPI(View):
-    def get(self,request):
-        q = request.GET.get('q')
+    def get(self, request):
+        q = request.GET.get("q")
         apartments = Apartment.objects.all()
         if q:
             apartments = apartments.filter(
-                Q(price__icontains=q) |
-                Q(address__icontains=q) |
-                Q(name__icontains=q) |
-                Q(floors__icontains=q) |
-                Q(bedrooms__icontains=q) |
-                Q(bathrooms__icontains=q) |
-                Q(additional_amenities__icontains=q)
+                Q(prices__icontains=q)
+                | Q(address__icontains=q)
+                | Q(name__icontains=q)
+                | Q(floors__icontains=q)
+                | Q(bedrooms__icontains=q)
+                | Q(bathrooms__icontains=q)
+                | Q(additional_amenities__icontains=q)
             )
         data = list(apartments.values())
+        return JsonResponse({"ok": True, "data": data})
 
-        return JsonResponse({"ok":True, "data":data})
 
-
-'''
-matplotlib.use('Agg')
-def apartment_price_chart_png(request):
-    rows = Apartment.objects.all().values('name', 'price', 'sqft_living').order_by('-price')
-
-    labels = [r['name']+" - "+str(r["sqft_living"])+"sqft" for r in rows]
-    prices = [r['price'] for r in rows]
-
-    fig, ax = plt.subplots(figsize=(10,10), dpi=200 )
-    ax.bar(labels, prices)# I could add color
-    ax.set_title('Apartment Price Chart Comparison')
-    ax.set_ylabel('Rent USD($)')
-    ax.set_xticks(ticks=list(range(len(labels))),labels=labels, rotation=45, ha='right')
-    fig.tight_layout()
-
-    buf = BytesIO()
-    fig.savefig(buf, format='png')
-    plt.close(fig)
-    buf.seek(0)
-    return HttpResponse(buf.getvalue(), content_type='image/png')
-'''
-# lines 104 - 106 is our public API endpoint
 def apartment_price_api(request):
-    q = list(Apartment.objects.all().values('name', 'price', 'sqft_living').order_by('-price'))
-    return JsonResponse({"ok":True, "data":q}, safe=False)
+    rows = []
+    for apartment in Apartment.objects.all().order_by("name"):
+        prices = normalize_prices(apartment.prices)
+        if not prices:
+            continue
+        rows.append(
+            {
+                "name": apartment.name or apartment.address or f"Apartment {apartment.pk}",
+                "price": prices[0],
+                "sqft_living": apartment.sqft_living,
+            }
+        )
+    return JsonResponse({"ok": True, "data": rows}, safe=False)
+
 
 def chart1_view(request):
+    return render(request, "vega_lite_charts/chart1.html")
 
-    return render(request, 'vega_lite_charts/chart1.html')
 
 def chart2_view(request):
+    return render(request, "vega_lite_charts/chart2.html")
 
-    return render(request, 'vega_lite_charts/chart2.html')
 
 def apartments_count_api(request):
-    qs = (
-        Apartment.objects
-        .annotate(date=TruncDate('date_scraped'))
-        .values('date')
-        .annotate(daily_count=Count('id'))
-        .order_by('date')
-    )
+    counts = {}
+    for apartment in Apartment.objects.exclude(date_scraped__isnull=True):
+        date_key = apartment.date_scraped.date().isoformat()
+        counts[date_key] = counts.get(date_key, 0) + 1
+
     data = []
     running_total = 0
-
-    for item in qs:
-        if item['date']:
-            running_total += item['daily_count']
-            data.append({
-                "date": str(item['date']),
-                "total": running_total
-            })
+    for date_key in sorted(counts.keys()):
+        running_total += counts[date_key]
+        data.append({"date": date_key, "total": running_total})
 
     return JsonResponse({"ok": True, "data": data}, safe=False)
 
 
 class StreetMap(View):
-
     def get(self, request):
-
-        # Prepare parameters for the API request
         params = {
-            # Champaign, IL
-            "lat": 40.1138,        # Champaign, IL latitude
-            "lon": -88.2260,      # Champaign, IL longitude
+            "lat": 40.1138,
+            "lon": -88.2260,
             "format": "json",
         }
-
-        headers = {
-            "User-Agent": "NestFinder/1.0 (lh32@illinois.edu)"
-        }
+        headers = {"User-Agent": "NestFinder/1.0 (lh32@illinois.edu)"}
 
         try:
-
-            output_raw_all = requests.get("https://nominatim.openstreetmap.org/reverse",
-                             params=params, headers=headers, timeout=5)
-
-            # Raise an error if the HTTP status code indicates a problem (e.g., 404, 500)
+            output_raw_all = requests.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params=params,
+                headers=headers,
+                timeout=5,
+            )
             output_raw_all.raise_for_status()
-
-            # Convert the response (which is text) into a Python dictionary
-            # Return the entire raw JSON as-is for exploration
-            # (This can be very large so use carefully in production!)
             output_polished_all = output_raw_all.json()
             return JsonResponse(output_polished_all, safe=False)
+        except requests.exceptions.RequestException as exc:
+            return JsonResponse({"ok": False, "error": str(exc)}, status=502)
 
-        # If *any* network or parsing error occurs, handle it gracefully
-        except requests.exceptions.RequestException as e:
-
-            # Return a 502 (Bad Gateway) response with an error message
-            # This helps us diagnose connectivity or API issues
-            return JsonResponse({"ok": False, "error": str(e)}, status=502)
-
-# ========================================
-# CSV export for Apartments
-
-import csv
-from datetime import datetime
 
 def export_apartments_csv(request):
-
-    #Generate and download a CSV file for all the apartments.
-    # STEP 1: Timestamp for unique filename
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     filename = f"apartments_{timestamp}.csv"
 
-    # STEP 2: Prepare HttpResponse
     response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = f'attachment; filename=\"{filename}\"'
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
-    # STEP 3: CSV writer
     writer = csv.writer(response)
+    writer.writerow(["name", "address", "prices", "floors", "bedrooms", "bathrooms", "sqft_living", "leasingCompany"])
 
-    # Header row
-    writer.writerow([
-         "name", "address", "price", "floors", "bedrooms", "bathrooms", "sqft_living","leasingCompany"
-    ])
-
-    # STEP 4: Query DB
     rows = (
-        Apartment.objects
-        .select_related("leasingCompany")
-        .values_list(
-             "name", "address", "price", "floors", "bedrooms", "bathrooms", "sqft_living", "leasingCompany"
-        )
-        .order_by("price")
+        Apartment.objects.select_related("leasingCompany")
+        .values_list("name", "address", "prices", "floors", "bedrooms", "bathrooms", "sqft_living", "leasingCompany__name")
+        .order_by("name")
     )
 
-    # STEP 5: Write rows
     for row in rows:
         writer.writerow(row)
 
-    # STEP 6: Return response
     return response
 
-# ========================================
-# JSON export for Apartments
-
-from datetime import datetime
-from django.http import JsonResponse
 
 def export_apartments_json(request):
-    """
-    Generate and download a JSON file for all apartments.
-    Mirrors the CSV export but returns structured JSON data.
-    """
-
-    # STEP 1: Query DB (values() returns dictionaries, perfect for JSON)
     rows = list(
-        Apartment.objects
-        .select_related("leasingCompany")
+        Apartment.objects.select_related("leasingCompany")
         .values(
-            "name", "address", "price", "floors", "bedrooms", "bathrooms", "sqft_living", "leasingCompany",
+            "name",
+            "address",
+            "prices",
+            "floors",
+            "bedrooms",
+            "bathrooms",
+            "sqft_living",
+            "leasingCompany__name",
         )
-        .order_by("price")
+        .order_by("name")
     )
 
-    # STEP 2: Build JSON structure with metadata
     json_content = {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "record_count": len(rows),
         "apartments": rows,
     }
 
-    # STEP 3: Create JsonResponse with pretty formatting
     response = JsonResponse(json_content, json_dumps_params={"indent": 2})
-
-    # STEP 4: Timestamped filename + download header
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     filename = f"apartments_{timestamp}.json"
-    response["Content-Disposition"] = f'attachment; filename=\"{filename}\"'
-
-    # STEP 5: Return response
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
 
 
@@ -303,34 +231,28 @@ def toggle_favorite_apartment(request, pk):
 
     if fav:
         fav.delete()
-        log_favorite_action(request.user, apartment, FavoriteActionLog.ACTION_UNPUSH)
+        FavoriteActionLog.objects.create(user=request.user, apartment=apartment, action="unpush")
     else:
         Favorite.objects.create(user=request.user, apartment=apartment)
-        log_favorite_action(request.user, apartment, FavoriteActionLog.ACTION_PUSH)
+        FavoriteActionLog.objects.create(user=request.user, apartment=apartment, action="push")
 
-    return redirect(request.META.get('HTTP_REFERER'), 'listing')
+    return redirect(request.META.get("HTTP_REFERER") or "listing")
 
 
 @login_required
 def apartments_favorite_api(request):
-
     total_apartments = Favorite.objects.filter(apartment__isnull=False).count()
-
     total_subleases = Favorite.objects.filter(sublease__isnull=False).count()
-
     total_all = Favorite.objects.count()
 
     data = [
         {"category": "Total Favorites", "count": total_all},
         {"category": "Apartments", "count": total_apartments},
-        {"category": "Subleases", "count": total_subleases}
+        {"category": "Subleases", "count": total_subleases},
     ]
 
     return JsonResponse(data, safe=False)
 
-# Ai_llama integration, it's the hugging face model we picked.
-from django.http import JsonResponse
-from NestFinder.secrets_environment import env
 
 MODEL_NAME = "gemini-3.1-flash-lite-preview"
 
@@ -341,6 +263,8 @@ def apartment_chatbot(request):
 
     user_message = request.POST.get("message", "").strip()
     mode = request.POST.get("mode", "local").strip().lower()
+    if mode not in {"local", "api"}:
+        mode = "local"
 
     if not user_message:
         return JsonResponse({"error": "Message is required."}, status=400)
@@ -350,58 +274,62 @@ def apartment_chatbot(request):
         return JsonResponse({"results": []})
 
     apartment_payload = [serialize_apartment_for_model(apartment) for apartment in apartments]
+    started = time.perf_counter()
+    usage_data = {}
     model_name = MODEL_NAME if mode == "api" else "Local RAG"
-    started_at = perf_counter()
 
     try:
         if mode == "api":
-            top_ids = geminiAPI(user_message, apartment_payload)
+            top_ids, usage_data = geminiAPI(user_message, apartment_payload)
         else:
-            from .ai_local_rag import rank_apartments_with_local_rag
             top_ids = rank_apartments_with_local_rag(user_message, apartment_payload)
 
         apartment_map = {apartment.id: apartment for apartment in apartments}
         ranked_apartments = []
-
         for apartment_id in top_ids:
             apartment = apartment_map.get(apartment_id)
             if apartment and apartment not in ranked_apartments:
                 ranked_apartments.append(apartment)
 
         results = [serialize_apartment_for_frontend(apartment) for apartment in ranked_apartments[:3]]
-        latency_ms = round((perf_counter() - started_at) * 1000)
+        latency_ms = max(1, int(round((time.perf_counter() - started) * 1000)))
 
-        log_ai_request(
+        AIRequestLog.objects.create(
             user=request.user if request.user.is_authenticated else None,
             request_text=user_message,
-            response_text=build_ai_response_text(results),
+            response_text=json.dumps(results, ensure_ascii=False),
             latency_ms=latency_ms,
-            mode=mode,
             model_name=model_name,
+            mode=mode,
             success=True,
+            prompt_tokens=usage_data.get("prompt_tokens"),
+            output_tokens=usage_data.get("output_tokens"),
+            total_tokens=usage_data.get("total_tokens"),
+            thinking_tokens=usage_data.get("thinking_tokens"),
         )
 
         return JsonResponse({"results": results})
 
     except Exception as exc:
-        latency_ms = round((perf_counter() - started_at) * 1000)
-        log_ai_request(
+        latency_ms = max(1, int(round((time.perf_counter() - started) * 1000)))
+        AIRequestLog.objects.create(
             user=request.user if request.user.is_authenticated else None,
             request_text=user_message,
             response_text="",
             latency_ms=latency_ms,
-            mode=mode,
             model_name=model_name,
+            mode=mode,
             success=False,
             error_message=str(exc),
+            prompt_tokens=usage_data.get("prompt_tokens"),
+            output_tokens=usage_data.get("output_tokens"),
+            total_tokens=usage_data.get("total_tokens"),
+            thinking_tokens=usage_data.get("thinking_tokens"),
         )
         return JsonResponse({"error": str(exc)}, status=500)
 
 
-def geminiAPI(message: str, apartments: list[dict]) -> list[int]:
-    from google import genai
-    from google.genai import types
-
+def geminiAPI(message: str, apartments: list[dict]) -> tuple[list[int], dict]:
     client = genai.Client(api_key=env("GEMINI_API_KEY"))
     prompt = build_gemini_ranking_prompt(message, apartments)
 
@@ -429,7 +357,8 @@ def geminiAPI(message: str, apartments: list[dict]) -> list[int]:
     )
 
     raw_text = extract_response_text(response)
-    return extract_top_ids(raw_text, apartments)
+    usage_data = extract_usage_metadata(response)
+    return extract_top_ids(raw_text, apartments), usage_data
 
 
 def build_gemini_ranking_prompt(user_query: str, apartments: list[dict]) -> str:
@@ -490,6 +419,35 @@ def extract_response_text(response) -> str:
         return ""
 
 
+def extract_usage_metadata(response) -> dict:
+    usage = getattr(response, "usage_metadata", None)
+    if not usage:
+        return {}
+
+    return {
+        "prompt_tokens": coerce_int(_usage_value(usage, "prompt_token_count")),
+        "output_tokens": coerce_int(_usage_value(usage, "candidates_token_count")),
+        "total_tokens": coerce_int(_usage_value(usage, "total_token_count")),
+        "thinking_tokens": coerce_int(_usage_value(usage, "thoughts_token_count")),
+    }
+
+
+def _usage_value(usage, attr_name):
+    value = getattr(usage, attr_name, None)
+    if value is not None:
+        return value
+    if isinstance(usage, dict):
+        return usage.get(attr_name)
+    return None
+
+
+def coerce_int(value):
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def extract_top_ids(raw_response: str, apartments: list[dict]) -> list[int]:
     valid_ids = {apartment["id"] for apartment in apartments if apartment.get("id") is not None}
 
@@ -497,11 +455,9 @@ def extract_top_ids(raw_response: str, apartments: list[dict]) -> list[int]:
         parsed = json.loads(raw_response)
         values = parsed.get("top_3", [])
         cleaned = []
-
         for value in values:
             if isinstance(value, int) and value in valid_ids and value not in cleaned:
                 cleaned.append(value)
-
         if len(cleaned) >= 3:
             return cleaned[:3]
     except Exception:
@@ -513,11 +469,9 @@ def extract_top_ids(raw_response: str, apartments: list[dict]) -> list[int]:
             parsed = json.loads(json_match.group(0))
             values = parsed.get("top_3", [])
             cleaned = []
-
             for value in values:
                 if isinstance(value, int) and value in valid_ids and value not in cleaned:
                     cleaned.append(value)
-
             if len(cleaned) >= 3:
                 return cleaned[:3]
     except Exception:
@@ -525,7 +479,6 @@ def extract_top_ids(raw_response: str, apartments: list[dict]) -> list[int]:
 
     numbers = re.findall(r"\d+", raw_response or "")
     cleaned = []
-
     for num in numbers:
         apartment_id = int(num)
         if apartment_id in valid_ids and apartment_id not in cleaned:
@@ -577,7 +530,6 @@ def serialize_apartment_for_frontend(apartment):
     price_display = format_price_display(prices)
 
     amenities = []
-
     if apartment.pets is True:
         amenities.append("Pets allowed")
     elif apartment.pets is False:
@@ -593,10 +545,8 @@ def serialize_apartment_for_frontend(apartment):
 
     if apartment.internet:
         amenities.append(str(apartment.internet))
-
     if apartment.housing_type:
         amenities.append(str(apartment.housing_type))
-
     if apartment.leasingCompany:
         amenities.append(f"Leasing: {apartment.leasingCompany}")
 
@@ -617,13 +567,11 @@ def serialize_apartment_for_frontend(apartment):
 def normalize_prices(prices):
     if not prices:
         return []
-
     if isinstance(prices, str):
         try:
             prices = json.loads(prices)
         except Exception:
             return []
-
     if not isinstance(prices, list):
         return []
 
@@ -633,7 +581,6 @@ def normalize_prices(prices):
             normalized.append(float(value))
         except (TypeError, ValueError):
             continue
-
     return sorted(normalized)
 
 
@@ -650,14 +597,12 @@ def flatten_additional_amenities(data):
         return ""
 
     parts = []
-
     if isinstance(data, dict):
         for key, value in data.items():
             if value in [None, "", [], {}]:
                 continue
 
             pretty_key = str(key).replace("_", " ").strip()
-
             if isinstance(value, list):
                 value_text = ", ".join(str(v) for v in value if v not in [None, ""])
             elif isinstance(value, dict):
@@ -675,126 +620,34 @@ def flatten_additional_amenities(data):
     return " | ".join(parts)
 
 
-def build_ai_response_text(results):
-    if not results:
-        return "No results returned"
-
-    parts = []
-    for result in results:
-        parts.append(f"#{result.get('id')}: {result.get('name') or 'Unnamed listing'}")
-    return " | ".join(parts)
+def _format_ts(dt):
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def normalize_analytics_text(value):
-    if not value:
-        return ""
-
-    value = value.lower().strip()
-    value = re.sub(r"[^a-z0-9\s$#.-]", " ", value)
-    value = re.sub(r"\s+", " ", value)
-    return value.strip()
+def _normalize_query(text):
+    return " ".join((text or "").strip().lower().split())
 
 
-def log_ai_request(user, request_text, response_text, latency_ms, mode, model_name, success=True, error_message=""):
-    try:
-        AIRequestLog.objects.create(
-            user=user if getattr(user, "is_authenticated", False) else None,
-            request_text=request_text,
-            normalized_request=normalize_analytics_text(request_text),
-            response_text=response_text,
-            normalized_response=normalize_analytics_text(response_text),
-            latency_ms=max(int(latency_ms or 0), 0),
-            mode=mode or "",
-            model_name=model_name or "",
-            success=success,
-            error_message=error_message or "",
-        )
-    except Exception:
-        pass
+def _normalize_response(text):
+    return " ".join((text or "").strip().split())
 
 
-def log_favorite_action(user, apartment, action):
-    try:
-        FavoriteActionLog.objects.create(
-            user=user if getattr(user, "is_authenticated", False) else None,
-            apartment=apartment,
-            action=action,
-        )
-    except Exception:
-        pass
+def _bucket_logs(logs, attr_name):
+    daily = {}
+    weekly = {}
 
-
-def build_daily_counts(items, timestamp_attr="created_at"):
-    counts = Counter()
-
-    for item in items:
-        dt = getattr(item, timestamp_attr, None)
+    for log in logs:
+        dt = getattr(log, attr_name)
         if not dt:
             continue
-        counts[dt.date().isoformat()] += 1
+        day_key = dt.date().isoformat()
+        week_start = dt.date().fromordinal(dt.date().toordinal() - dt.weekday()).isoformat()
+        daily[day_key] = daily.get(day_key, 0) + 1
+        weekly[week_start] = weekly.get(week_start, 0) + 1
 
-    return [{"label": label, "count": counts[label]} for label in sorted(counts.keys())]
-
-
-def build_weekly_counts(items, timestamp_attr="created_at"):
-    counts = Counter()
-
-    for item in items:
-        dt = getattr(item, timestamp_attr, None)
-        if not dt:
-            continue
-        week_start = (dt.date() - timedelta(days=dt.weekday())).isoformat()
-        counts[week_start] += 1
-
-    return [{"label": label, "count": counts[label]} for label in sorted(counts.keys())]
-
-
-def build_repeat_output_rows(ai_logs, limit=25):
-    grouped = defaultdict(list)
-
-    for log in ai_logs:
-        if log.success and log.normalized_response:
-            grouped[log.normalized_response].append(log)
-
-    rows = []
-    cluster_number = 1
-
-    for _, logs in grouped.items():
-        unique_requests = []
-        seen_requests = set()
-
-        for log in logs:
-            normalized_request = log.normalized_request or normalize_analytics_text(log.request_text)
-            if normalized_request not in seen_requests:
-                seen_requests.add(normalized_request)
-                unique_requests.append(log)
-
-        if len(unique_requests) < 2:
-            continue
-
-        request_texts = [log.request_text.strip() for log in unique_requests if log.request_text.strip()]
-        if len(request_texts) < 2:
-            continue
-
-        similarity_scores = []
-        for index, left in enumerate(request_texts):
-            for right in request_texts[index + 1:]:
-                similarity_scores.append(SequenceMatcher(None, left.lower(), right.lower()).ratio())
-
-        avg_similarity = round((sum(similarity_scores) / len(similarity_scores)) if similarity_scores else 1.0, 3)
-
-        rows.append({
-            "cluster_id": f"OUT-{cluster_number:03d}",
-            "requests": request_texts[:4],
-            "output": logs[0].response_text or "No output text stored",
-            "similarity_score": avg_similarity,
-            "repeat_count": len(logs),
-            "distinct_request_count": len(request_texts),
-        })
-        cluster_number += 1
-
-    rows.sort(key=lambda row: (-row["repeat_count"], row["similarity_score"], -row["distinct_request_count"]))
-    return rows[:limit]
+    daily_points = [{"label": key, "value": daily[key]} for key in sorted(daily.keys())]
+    weekly_points = [{"label": key, "value": weekly[key]} for key in sorted(weekly.keys())]
+    return daily_points, weekly_points
 
 
 @login_required
@@ -802,76 +655,128 @@ def analytics_view(request):
     if not request.user.is_superuser:
         raise PermissionDenied
 
-    ai_logs = list(AIRequestLog.objects.all().order_by("created_at"))
-    favorite_logs = list(FavoriteActionLog.objects.all().order_by("created_at"))
+    ai_logs = list(AIRequestLog.objects.order_by("created_at"))
+    favorite_logs = list(FavoriteActionLog.objects.order_by("created_at"))
 
-    ai_latency_series = [
+    latency_records = [
         {
-            "label": log.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            "label": _format_ts(log.created_at),
             "latency_ms": log.latency_ms,
-            "series": "API" if (log.mode or "").lower() == "api" else "RAG",
+            "mode": log.mode,
+            "model_name": log.model_name or ("Local RAG" if log.mode == "local" else "API"),
         }
         for log in ai_logs
+        if log.latency_ms is not None
     ]
-
-    model_latency_map = defaultdict(lambda: {"latencies": [], "count": 0})
-    for log in ai_logs:
-        model_key = log.model_name or log.mode or "Unknown"
-        model_latency_map[model_key]["latencies"].append(log.latency_ms)
-        model_latency_map[model_key]["count"] += 1
 
     model_latency_data = [
         {
-            "label": model_name,
-            "avg_latency_ms": round(sum(values["latencies"]) / len(values["latencies"]), 2),
-            "request_count": values["count"],
+            "label": row["model_name"] or "Unknown",
+            "avg_latency_ms": round(float(row["avg_latency_ms"] or 0), 2),
+            "request_count": row["request_count"],
         }
-        for model_name, values in sorted(model_latency_map.items())
-        if values["latencies"]
+        for row in AIRequestLog.objects.filter(success=True, latency_ms__isnull=False)
+        .values("model_name")
+        .annotate(avg_latency_ms=Avg("latency_ms"), request_count=Count("id"))
+        .order_by("model_name")
     ]
 
-    query_counts = Counter()
-    query_examples = {}
+    query_counts = {}
+    query_display = {}
     for log in ai_logs:
-        normalized = log.normalized_request or normalize_analytics_text(log.request_text)
-        if not normalized:
+        key = _normalize_query(log.request_text)
+        if not key:
             continue
-        query_counts[normalized] += 1
-        query_examples.setdefault(normalized, log.request_text)
+        query_counts[key] = query_counts.get(key, 0) + 1
+        query_display.setdefault(key, log.request_text.strip())
 
-    common_queries_data = [
-        {"label": query_examples[key], "count": count}
-        for key, count in query_counts.most_common(10)
+    common_queries = [
+        {"label": query_display[key], "count": count}
+        for key, count in sorted(query_counts.items(), key=lambda item: (-item[1], query_display[item[0]]))[:10]
     ]
 
-    ai_usage_daily = build_daily_counts(ai_logs)
-    ai_usage_weekly = build_weekly_counts(ai_logs)
-    favorite_usage_daily = build_daily_counts(favorite_logs)
-    favorite_usage_weekly = build_weekly_counts(favorite_logs)
+    ai_daily, ai_weekly = _bucket_logs(ai_logs, "created_at")
+    favorite_daily, favorite_weekly = _bucket_logs(favorite_logs, "created_at")
 
-    favorite_action_breakdown = {
-        "push": sum(1 for log in favorite_logs if log.action == FavoriteActionLog.ACTION_PUSH),
-        "unpush": sum(1 for log in favorite_logs if log.action == FavoriteActionLog.ACTION_UNPUSH),
-    }
+    token_records = [
+        {
+            "label": _format_ts(log.created_at),
+            "total_tokens": log.total_tokens,
+            "prompt_tokens": log.prompt_tokens,
+            "output_tokens": log.output_tokens,
+            "model_name": log.model_name or "Unknown",
+        }
+        for log in ai_logs
+        if log.total_tokens is not None
+    ]
 
-    avg_latency = round(sum(log.latency_ms for log in ai_logs) / len(ai_logs), 2) if ai_logs else 0
-    repeat_output_rows = build_repeat_output_rows(ai_logs)
+    total_tokens_sum = sum((log.total_tokens or 0) for log in ai_logs)
+    token_request_count = sum(1 for log in ai_logs if log.total_tokens is not None)
+    avg_total_tokens = round(total_tokens_sum / token_request_count, 2) if token_request_count else 0
+
+    response_groups = {}
+    for log in ai_logs:
+        normalized_response = _normalize_response(log.response_text)
+        normalized_request = _normalize_query(log.request_text)
+        if not normalized_response or not normalized_request:
+            continue
+        bucket = response_groups.setdefault(
+            normalized_response,
+            {
+                "response_text": log.response_text,
+                "request_texts": set(),
+                "count": 0,
+                "model_names": set(),
+            },
+        )
+        bucket["request_texts"].add(log.request_text.strip())
+        bucket["count"] += 1
+        if log.model_name:
+            bucket["model_names"].add(log.model_name)
+
+    repeated_outputs = []
+    cluster_id = 1
+    for bucket in sorted(response_groups.values(), key=lambda item: (-item["count"], item["response_text"])):
+        if len(bucket["request_texts"]) < 2:
+            continue
+        request_examples = sorted(bucket["request_texts"])[:3]
+        repeated_outputs.append(
+            {
+                "cluster_id": cluster_id,
+                "similarity": 1.0,
+                "repeat_count": bucket["count"],
+                "request_examples": request_examples,
+                "response_text": bucket["response_text"],
+                "models": ", ".join(sorted(bucket["model_names"])) if bucket["model_names"] else "Unknown",
+            }
+        )
+        cluster_id += 1
+
+    successful_ai_logs = [log for log in ai_logs if log.success]
+    failed_ai_logs = [log for log in ai_logs if not log.success]
+    favorite_pushes = sum(1 for log in favorite_logs if log.action == "push")
+    favorite_unpushes = sum(1 for log in favorite_logs if log.action == "unpush")
 
     context = {
-        "total_ai_requests": len(ai_logs),
-        "avg_ai_latency": avg_latency,
-        "unique_query_count": len(query_counts),
-        "total_favorite_actions": len(favorite_logs),
-        "favorite_push_count": favorite_action_breakdown["push"],
-        "favorite_unpush_count": favorite_action_breakdown["unpush"],
-        "ai_latency_series": ai_latency_series,
+        "summary_cards": [
+            {"label": "AI requests", "value": len(ai_logs)},
+            {"label": "Successful AI requests", "value": len(successful_ai_logs)},
+            {"label": "Failed AI requests", "value": len(failed_ai_logs)},
+            {"label": "Favorite actions", "value": len(favorite_logs)},
+            {"label": "Favorite pushes", "value": favorite_pushes},
+            {"label": "Favorite unpushes", "value": favorite_unpushes},
+            {"label": "Total API tokens", "value": total_tokens_sum},
+            {"label": "Average tokens per tokenized request", "value": avg_total_tokens},
+        ],
+        "latency_records": latency_records,
         "model_latency_data": model_latency_data,
-        "common_queries_data": common_queries_data,
-        "ai_usage_daily": ai_usage_daily,
-        "ai_usage_weekly": ai_usage_weekly,
-        "favorite_usage_daily": favorite_usage_daily,
-        "favorite_usage_weekly": favorite_usage_weekly,
-        "repeat_output_rows": repeat_output_rows,
+        "common_queries": common_queries,
+        "ai_usage_daily": ai_daily,
+        "ai_usage_weekly": ai_weekly,
+        "favorite_usage_daily": favorite_daily,
+        "favorite_usage_weekly": favorite_weekly,
+        "token_records": token_records,
+        "repeated_outputs": repeated_outputs[:25],
     }
 
     return render(request, "admin/analytics.html", context)

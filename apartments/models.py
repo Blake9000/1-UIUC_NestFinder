@@ -1,8 +1,8 @@
-# apartments/models.py
 from django.conf import settings
 from django.db import models
 import os
 from datetime import datetime
+
 
 def timestamped_image_path(instance, filename):
     base, ext = os.path.splitext(filename)
@@ -21,17 +21,17 @@ class LeasingCompany(models.Model):
 
 
 class Apartment(models.Model):
-    prices = models.JSONField(default=list, null=True, blank=True)   # was price
+    prices = models.JSONField(default=list, null=True, blank=True)
     name = models.TextField(null=True, blank=True)
-    address = models.TextField(blank=True, default="")              # allow fallback to name
+    address = models.TextField(blank=True, default="")
     leasingCompany = models.ForeignKey(LeasingCompany, on_delete=models.CASCADE, null=True, blank=True)
 
     apartments_images = models.URLField(null=True, blank=True)
     apartments_url = models.URLField(null=True, blank=True)
 
-    bedrooms = models.IntegerField(null=True, blank=True)           # scraper emits Optional[int]
-    bathrooms = models.FloatField(null=True, blank=True)            # scraper emits Optional[float]
-    sqft_living = models.IntegerField(null=True, blank=True)        # scraper emits Optional[int]
+    bedrooms = models.IntegerField(null=True, blank=True)
+    bathrooms = models.FloatField(null=True, blank=True)
+    sqft_living = models.IntegerField(null=True, blank=True)
 
     floors = models.IntegerField(null=True, blank=True)
     pets = models.BooleanField(null=True, blank=True)
@@ -48,7 +48,6 @@ class Apartment(models.Model):
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
 
-
     def __str__(self):
         return f"{self.name} at {self.address}".strip()
 
@@ -61,61 +60,48 @@ class ApartmentImages(models.Model):
     image = models.ImageField(upload_to=timestamped_image_path)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
+
 class AIRequestLog(models.Model):
+    MODE_CHOICES = [
+        ("local", "Local RAG"),
+        ("api", "API"),
+    ]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="ai_request_logs",
-    )
-    mode = models.CharField(max_length=20, blank=True)
-    model_name = models.CharField(max_length=120, blank=True)
     request_text = models.TextField()
-    normalized_request = models.TextField(blank=True)
     response_text = models.TextField(blank=True)
-    normalized_response = models.TextField(blank=True)
-    latency_ms = models.PositiveIntegerField(default=0)
-    success = models.BooleanField(default=True)
+    latency_ms = models.PositiveIntegerField(null=True, blank=True)
+    model_name = models.CharField(max_length=255, blank=True, default="", db_index=True)
+    mode = models.CharField(max_length=20, choices=MODE_CHOICES, default="local", db_index=True)
+    success = models.BooleanField(default=True, db_index=True)
     error_message = models.TextField(blank=True)
+    prompt_tokens = models.PositiveIntegerField(null=True, blank=True)
+    output_tokens = models.PositiveIntegerField(null=True, blank=True)
+    total_tokens = models.PositiveIntegerField(null=True, blank=True)
+    thinking_tokens = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
-        status = "success" if self.success else "error"
-        return f"{self.model_name or self.mode or 'ai'} request ({status}) @ {self.created_at:%Y-%m-%d %H:%M}"
+        return f"{self.model_name or self.mode} @ {self.created_at:%Y-%m-%d %H:%M:%S}"
 
 
 class FavoriteActionLog(models.Model):
-    ACTION_PUSH = "push"
-    ACTION_UNPUSH = "unpush"
     ACTION_CHOICES = [
-        (ACTION_PUSH, "Push"),
-        (ACTION_UNPUSH, "Unpush"),
+        ("push", "Push"),
+        ("unpush", "Unpush"),
     ]
 
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="favorite_action_logs",
-    )
-    apartment = models.ForeignKey(
-        Apartment,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="favorite_action_logs",
-    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    apartment = models.ForeignKey(Apartment, on_delete=models.SET_NULL, null=True, blank=True)
     action = models.CharField(max_length=10, choices=ACTION_CHOICES, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
-        apartment_name = self.apartment.name if self.apartment else "Unknown apartment"
-        return f"{self.action} favorite for {apartment_name}"
+        apartment_label = self.apartment.name if self.apartment and self.apartment.name else "Apartment"
+        return f"{self.action} {apartment_label}"
