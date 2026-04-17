@@ -2,9 +2,393 @@
 
 {% block title %}Analytics{% endblock %}
 
+{% block head %}
+<style>
+  .analytics-shell {
+    max-width: 1400px;
+  }
+
+  .analytics-card {
+    background: #ffffff;
+    border: 1px solid #e8e6e0;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(26, 25, 23, 0.04);
+    height: 100%;
+  }
+
+  .analytics-card .card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+  }
+
+  .analytics-kpi {
+    font-size: 1.85rem;
+    font-weight: 600;
+    color: #1a1917;
+  }
+
+  .analytics-subtle {
+    color: #6a6760;
+    font-size: 0.92rem;
+  }
+
+  .analytics-chart-wrap {
+    position: relative;
+    min-height: 320px;
+  }
+
+  .analytics-table td,
+  .analytics-table th {
+    vertical-align: top;
+  }
+
+  .analytics-chip {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    background: #f0ede6;
+    color: #4a4840;
+    font-size: 0.8rem;
+    margin: 0.15rem 0.25rem 0.15rem 0;
+  }
+
+  .analytics-empty {
+    border: 1px dashed #d8d4cb;
+    border-radius: 12px;
+    padding: 1rem;
+    color: #6a6760;
+    background: #fbfaf8;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-5">
-    <h1>Analytics</h1>
-    <p>Superuser-only analytics page.</p>
+<div class="container-fluid py-4 analytics-shell">
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+    <div>
+      <h1 class="mb-1">Analytics</h1>
+      <p class="analytics-subtle mb-0">Superuser dashboard for AI usage, latency, repeated outputs, and favorite actions.</p>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="card analytics-card">
+        <div class="card-body">
+          <div class="analytics-subtle">Total AI requests</div>
+          <div class="analytics-kpi">{{ total_ai_requests }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="card analytics-card">
+        <div class="card-body">
+          <div class="analytics-subtle">Average AI latency</div>
+          <div class="analytics-kpi">{{ avg_ai_latency }} ms</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="card analytics-card">
+        <div class="card-body">
+          <div class="analytics-subtle">Unique user queries</div>
+          <div class="analytics-kpi">{{ unique_query_count }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="card analytics-card">
+        <div class="card-body">
+          <div class="analytics-subtle">Favorite actions</div>
+          <div class="analytics-kpi">{{ total_favorite_actions }}</div>
+          <div class="analytics-subtle mt-2">Pushes: {{ favorite_push_count }} | Unpushes: {{ favorite_unpush_count }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-8">
+      <div class="card analytics-card">
+        <div class="card-body">
+          <h2 class="card-title">How consistent is the response time?</h2>
+          <p class="analytics-subtle">Request timestamp versus latency in milliseconds.</p>
+          {% if ai_latency_series %}
+            <div class="analytics-chart-wrap"><canvas id="latencyConsistencyChart"></canvas></div>
+          {% else %}
+            <div class="analytics-empty">No AI request logs yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-4">
+      <div class="card analytics-card">
+        <div class="card-body">
+          <h2 class="card-title">How does latency vary across different models?</h2>
+          <p class="analytics-subtle">Average latency in milliseconds for each model.</p>
+          {% if model_latency_data %}
+            <div class="analytics-chart-wrap"><canvas id="modelLatencyChart"></canvas></div>
+          {% else %}
+            <div class="analytics-empty">No model latency data yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+      <div class="card analytics-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start gap-3">
+            <div>
+              <h2 class="card-title">What are the most common user queries?</h2>
+              <p class="analytics-subtle">Top repeated query texts captured from the AI feature.</p>
+            </div>
+          </div>
+          {% if common_queries_data %}
+            <div class="analytics-chart-wrap"><canvas id="commonQueriesChart"></canvas></div>
+          {% else %}
+            <div class="analytics-empty">No query frequency data yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+      <div class="card analytics-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+            <div>
+              <h2 class="card-title mb-1">How frequently is the AI feature used?</h2>
+              <p class="analytics-subtle mb-0">Request totals grouped by day or week.</p>
+            </div>
+            <div class="btn-group btn-group-sm" role="group" aria-label="AI usage interval">
+              <button type="button" class="btn btn-outline-secondary active" data-chart-toggle="aiUsage" data-range="daily">Daily</button>
+              <button type="button" class="btn btn-outline-secondary" data-chart-toggle="aiUsage" data-range="weekly">Weekly</button>
+            </div>
+          </div>
+          {% if ai_usage_daily or ai_usage_weekly %}
+            <div class="analytics-chart-wrap mt-3"><canvas id="aiUsageChart"></canvas></div>
+          {% else %}
+            <div class="analytics-empty mt-3">No AI usage data yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card analytics-card">
+        <div class="card-body">
+          <h2 class="card-title">Are there repeat outputs returned despite differentiating requests?</h2>
+          <p class="analytics-subtle">Outputs are clustered when the same stored result text appears for multiple distinct requests. Lower similarity scores indicate the inputs differ more.</p>
+          {% if repeat_output_rows %}
+            <div class="table-responsive">
+              <table class="table analytics-table align-middle">
+                <thead>
+                  <tr>
+                    <th>Cluster ID</th>
+                    <th>Request text</th>
+                    <th>Output text</th>
+                    <th>Similarity score</th>
+                    <th>Distinct requests</th>
+                    <th>Total repeats</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in repeat_output_rows %}
+                    <tr>
+                      <td><span class="analytics-chip">{{ row.cluster_id }}</span></td>
+                      <td>
+                        {% for request_text in row.requests %}
+                          <div class="mb-2">{{ request_text }}</div>
+                        {% endfor %}
+                      </td>
+                      <td>{{ row.output }}</td>
+                      <td>{{ row.similarity_score }}</td>
+                      <td>{{ row.distinct_request_count }}</td>
+                      <td>{{ row.repeat_count }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="analytics-empty">No repeated-output clusters yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card analytics-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+            <div>
+              <h2 class="card-title mb-1">How frequently is the Favorite feature used?</h2>
+              <p class="analytics-subtle mb-0">Push and unpush actions grouped by day or week.</p>
+            </div>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Favorite usage interval">
+              <button type="button" class="btn btn-outline-secondary active" data-chart-toggle="favoriteUsage" data-range="daily">Daily</button>
+              <button type="button" class="btn btn-outline-secondary" data-chart-toggle="favoriteUsage" data-range="weekly">Weekly</button>
+            </div>
+          </div>
+          {% if favorite_usage_daily or favorite_usage_weekly %}
+            <div class="analytics-chart-wrap mt-3"><canvas id="favoriteUsageChart"></canvas></div>
+          {% else %}
+            <div class="analytics-empty mt-3">No favorite usage data yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+
+{{ ai_latency_series|json_script:"ai-latency-series" }}
+{{ model_latency_data|json_script:"model-latency-data" }}
+{{ common_queries_data|json_script:"common-queries-data" }}
+{{ ai_usage_daily|json_script:"ai-usage-daily" }}
+{{ ai_usage_weekly|json_script:"ai-usage-weekly" }}
+{{ favorite_usage_daily|json_script:"favorite-usage-daily" }}
+{{ favorite_usage_weekly|json_script:"favorite-usage-weekly" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const parseScriptData = (id) => {
+    const node = document.getElementById(id);
+    return node ? JSON.parse(node.textContent) : [];
+  };
+
+  const buildLineChart = (canvasId, dataPoints, labelText) => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !dataPoints.length) return null;
+
+    return new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: dataPoints.map(item => item.label),
+        datasets: [{
+          label: labelText,
+          data: dataPoints.map(item => item.value),
+          tension: 0.25,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  };
+
+  const buildBarChart = (canvasId, labels, values, datasetLabel, indexAxis = 'x') => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !labels.length) return null;
+
+    return new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: datasetLabel,
+          data: values
+        }]
+      },
+      options: {
+        indexAxis: indexAxis,
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  };
+
+  const latencySeries = parseScriptData('ai-latency-series');
+  const modelLatencyData = parseScriptData('model-latency-data');
+  const commonQueriesData = parseScriptData('common-queries-data');
+  const aiUsageDaily = parseScriptData('ai-usage-daily');
+  const aiUsageWeekly = parseScriptData('ai-usage-weekly');
+  const favoriteUsageDaily = parseScriptData('favorite-usage-daily');
+  const favoriteUsageWeekly = parseScriptData('favorite-usage-weekly');
+
+  if (latencySeries.length) {
+    buildLineChart(
+      'latencyConsistencyChart',
+      latencySeries.map(item => ({ label: item.label, value: item.latency_ms })),
+      'Latency (ms)'
+    );
+  }
+
+  if (modelLatencyData.length) {
+    buildBarChart(
+      'modelLatencyChart',
+      modelLatencyData.map(item => item.label),
+      modelLatencyData.map(item => item.avg_latency_ms),
+      'Average latency (ms)'
+    );
+  }
+
+  if (commonQueriesData.length) {
+    buildBarChart(
+      'commonQueriesChart',
+      commonQueriesData.map(item => item.label),
+      commonQueriesData.map(item => item.count),
+      'Query count',
+      'y'
+    );
+  }
+
+  const usageCharts = {};
+
+  const buildUsageDataset = (items) => items.map(item => ({ label: item.label, value: item.count }));
+
+  usageCharts.aiUsage = buildLineChart(
+    'aiUsageChart',
+    buildUsageDataset(aiUsageDaily.length ? aiUsageDaily : aiUsageWeekly),
+    'AI requests'
+  );
+
+  usageCharts.favoriteUsage = buildLineChart(
+    'favoriteUsageChart',
+    buildUsageDataset(favoriteUsageDaily.length ? favoriteUsageDaily : favoriteUsageWeekly),
+    'Favorite actions'
+  );
+
+  const usageSources = {
+    aiUsage: { daily: aiUsageDaily, weekly: aiUsageWeekly, label: 'AI requests' },
+    favoriteUsage: { daily: favoriteUsageDaily, weekly: favoriteUsageWeekly, label: 'Favorite actions' }
+  };
+
+  document.querySelectorAll('[data-chart-toggle]').forEach(button => {
+    button.addEventListener('click', () => {
+      const group = button.dataset.chartToggle;
+      const range = button.dataset.range;
+      const chart = usageCharts[group];
+      const source = usageSources[group];
+      if (!chart || !source || !source[range]) return;
+
+      const dataPoints = buildUsageDataset(source[range]);
+      chart.data.labels = dataPoints.map(item => item.label);
+      chart.data.datasets[0].label = source.label;
+      chart.data.datasets[0].data = dataPoints.map(item => item.value);
+      chart.update();
+
+      document.querySelectorAll(`[data-chart-toggle="${group}"]`).forEach(peer => peer.classList.remove('active'));
+      button.classList.add('active');
+    });
+  });
+</script>
 {% endblock %}

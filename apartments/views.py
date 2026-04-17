@@ -1,9 +1,13 @@
 import json
 import re
+from collections import Counter, defaultdict
+from datetime import datetime, timedelta
+from difflib import SequenceMatcher
+from time import perf_counter
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Q
+from django.db.models import Avg, Q
 from django.db.models.aggregates import Count
 from django.db.models.functions import TruncDate
 from django.http import HttpResponse
@@ -11,11 +15,10 @@ from django.shortcuts import redirect
 from django.views.generic import ListView
 from django.shortcuts import render, get_object_or_404
 from django.views import View
-from apartments.models import Apartment
+from apartments.models import AIRequestLog, Apartment, FavoriteActionLog
 from io import BytesIO
 import requests
 from users.models import Favorite
-from .ai_local_rag import rank_apartments_with_local_rag
 from django.core.exceptions import PermissionDenied
 
 # Create your views here.
@@ -297,10 +300,14 @@ def export_apartments_json(request):
 def toggle_favorite_apartment(request, pk):
     apartment = get_object_or_404(Apartment, pk=pk)
     fav = Favorite.objects.filter(user=request.user, apartment=apartment).first()
+
     if fav:
         fav.delete()
+        log_favorite_action(request.user, apartment, FavoriteActionLog.ACTION_UNPUSH)
     else:
-        fav = Favorite.objects.create(user=request.user, apartment=apartment)
+        Favorite.objects.create(user=request.user, apartment=apartment)
+        log_favorite_action(request.user, apartment, FavoriteActionLog.ACTION_PUSH)
+
     return redirect(request.META.get('HTTP_REFERER'), 'listing')
 
 
@@ -322,52 +329,11 @@ def apartments_favorite_api(request):
     return JsonResponse(data, safe=False)
 
 # Ai_llama integration, it's the hugging face model we picked.
-from django.shortcuts import render
 from django.http import JsonResponse
-#from .ai_llama import *
+from NestFinder.secrets_environment import env
 
-#Old apartment chatbot view. Requires good gpu to function
-'''
-def apartment_chatbot(request):
-    if request.method == "GET":
-        return render(request, "chatbot/chatbot.html")
+MODEL_NAME = "gemini-3.1-flash-lite-preview"
 
-    user_message = request.POST.get("message", "").strip()
-    mode = request.POST.get("mode", "local").strip().lower()
-
-    if not user_message:
-        return JsonResponse({"error": "Message is required."}, status=400)
-
-    apartments = list(
-        Apartment.objects.select_related("leasingCompany").all()
-    )
-
-    if not apartments:
-        return JsonResponse({"results": []})
-
-    apartment_payload = [serialize_apartment_for_model(apartment) for apartment in apartments]
-
-    try:
-        if mode == "api":
-            top_ids = geminiAPI(user_message, apartment_payload)
-        else:
-            top_ids = rank_apartments_with_llama(user_message, apartment_payload)
-
-        apartment_map = {apartment.id: apartment for apartment in apartments}
-
-        ranked_apartments = []
-        for apartment_id in top_ids:
-            apartment = apartment_map.get(apartment_id)
-            if apartment and apartment not in ranked_apartments:
-                ranked_apartments.append(apartment)
-
-        results = [serialize_apartment_for_frontend(apartment) for apartment in ranked_apartments[:3]]
-
-        return JsonResponse({"results": results})
-
-    except Exception as exc:
-        return JsonResponse({"error": str(exc)}, status=500)
-'''
 
 def apartment_chatbot(request):
     if request.method == "GET":
@@ -379,14 +345,13 @@ def apartment_chatbot(request):
     if not user_message:
         return JsonResponse({"error": "Message is required."}, status=400)
 
-    apartments = list(
-        Apartment.objects.select_related("leasingCompany").all()
-    )
-
+    apartments = list(Apartment.objects.select_related("leasingCompany").all())
     if not apartments:
         return JsonResponse({"results": []})
 
     apartment_payload = [serialize_apartment_for_model(apartment) for apartment in apartments]
+    model_name = MODEL_NAME if mode == "api" else "Local RAG"
+    started_at = perf_counter()
 
     try:
         if mode == "api":
@@ -396,29 +361,48 @@ def apartment_chatbot(request):
             top_ids = rank_apartments_with_local_rag(user_message, apartment_payload)
 
         apartment_map = {apartment.id: apartment for apartment in apartments}
-
         ranked_apartments = []
+
         for apartment_id in top_ids:
             apartment = apartment_map.get(apartment_id)
             if apartment and apartment not in ranked_apartments:
                 ranked_apartments.append(apartment)
 
         results = [serialize_apartment_for_frontend(apartment) for apartment in ranked_apartments[:3]]
+        latency_ms = round((perf_counter() - started_at) * 1000)
+
+        log_ai_request(
+            user=request.user if request.user.is_authenticated else None,
+            request_text=user_message,
+            response_text=build_ai_response_text(results),
+            latency_ms=latency_ms,
+            mode=mode,
+            model_name=model_name,
+            success=True,
+        )
 
         return JsonResponse({"results": results})
 
     except Exception as exc:
+        latency_ms = round((perf_counter() - started_at) * 1000)
+        log_ai_request(
+            user=request.user if request.user.is_authenticated else None,
+            request_text=user_message,
+            response_text="",
+            latency_ms=latency_ms,
+            mode=mode,
+            model_name=model_name,
+            success=False,
+            error_message=str(exc),
+        )
         return JsonResponse({"error": str(exc)}, status=500)
 
-from google import genai
-from NestFinder.secrets_environment import env
-from google.genai import types
-
-MODEL_NAME = "gemini-3.1-flash-lite-preview"
 
 def geminiAPI(message: str, apartments: list[dict]) -> list[int]:
-    client = genai.Client(api_key=env("GEMINI_API_KEY"))
+    from google import genai
+    from google.genai import types
 
+    client = genai.Client(api_key=env("GEMINI_API_KEY"))
     prompt = build_gemini_ranking_prompt(message, apartments)
 
     response = client.models.generate_content(
@@ -690,9 +674,203 @@ def flatten_additional_amenities(data):
 
     return " | ".join(parts)
 
+
+def build_ai_response_text(results):
+    if not results:
+        return "No results returned"
+
+    parts = []
+    for result in results:
+        parts.append(f"#{result.get('id')}: {result.get('name') or 'Unnamed listing'}")
+    return " | ".join(parts)
+
+
+def normalize_analytics_text(value):
+    if not value:
+        return ""
+
+    value = value.lower().strip()
+    value = re.sub(r"[^a-z0-9\s$#.-]", " ", value)
+    value = re.sub(r"\s+", " ", value)
+    return value.strip()
+
+
+def log_ai_request(user, request_text, response_text, latency_ms, mode, model_name, success=True, error_message=""):
+    try:
+        AIRequestLog.objects.create(
+            user=user if getattr(user, "is_authenticated", False) else None,
+            request_text=request_text,
+            normalized_request=normalize_analytics_text(request_text),
+            response_text=response_text,
+            normalized_response=normalize_analytics_text(response_text),
+            latency_ms=max(int(latency_ms or 0), 0),
+            mode=mode or "",
+            model_name=model_name or "",
+            success=success,
+            error_message=error_message or "",
+        )
+    except Exception:
+        pass
+
+
+def log_favorite_action(user, apartment, action):
+    try:
+        FavoriteActionLog.objects.create(
+            user=user if getattr(user, "is_authenticated", False) else None,
+            apartment=apartment,
+            action=action,
+        )
+    except Exception:
+        pass
+
+
+def build_daily_counts(items, timestamp_attr="created_at"):
+    counts = Counter()
+
+    for item in items:
+        dt = getattr(item, timestamp_attr, None)
+        if not dt:
+            continue
+        counts[dt.date().isoformat()] += 1
+
+    return [{"label": label, "count": counts[label]} for label in sorted(counts.keys())]
+
+
+def build_weekly_counts(items, timestamp_attr="created_at"):
+    counts = Counter()
+
+    for item in items:
+        dt = getattr(item, timestamp_attr, None)
+        if not dt:
+            continue
+        week_start = (dt.date() - timedelta(days=dt.weekday())).isoformat()
+        counts[week_start] += 1
+
+    return [{"label": label, "count": counts[label]} for label in sorted(counts.keys())]
+
+
+def build_repeat_output_rows(ai_logs, limit=25):
+    grouped = defaultdict(list)
+
+    for log in ai_logs:
+        if log.success and log.normalized_response:
+            grouped[log.normalized_response].append(log)
+
+    rows = []
+    cluster_number = 1
+
+    for _, logs in grouped.items():
+        unique_requests = []
+        seen_requests = set()
+
+        for log in logs:
+            normalized_request = log.normalized_request or normalize_analytics_text(log.request_text)
+            if normalized_request not in seen_requests:
+                seen_requests.add(normalized_request)
+                unique_requests.append(log)
+
+        if len(unique_requests) < 2:
+            continue
+
+        request_texts = [log.request_text.strip() for log in unique_requests if log.request_text.strip()]
+        if len(request_texts) < 2:
+            continue
+
+        similarity_scores = []
+        for index, left in enumerate(request_texts):
+            for right in request_texts[index + 1:]:
+                similarity_scores.append(SequenceMatcher(None, left.lower(), right.lower()).ratio())
+
+        avg_similarity = round((sum(similarity_scores) / len(similarity_scores)) if similarity_scores else 1.0, 3)
+
+        rows.append({
+            "cluster_id": f"OUT-{cluster_number:03d}",
+            "requests": request_texts[:4],
+            "output": logs[0].response_text or "No output text stored",
+            "similarity_score": avg_similarity,
+            "repeat_count": len(logs),
+            "distinct_request_count": len(request_texts),
+        })
+        cluster_number += 1
+
+    rows.sort(key=lambda row: (-row["repeat_count"], row["similarity_score"], -row["distinct_request_count"]))
+    return rows[:limit]
+
+
 @login_required
 def analytics_view(request):
     if not request.user.is_superuser:
         raise PermissionDenied
 
-    return render(request, "admin/analytics.html")
+    ai_logs = list(AIRequestLog.objects.all().order_by("created_at"))
+    favorite_logs = list(FavoriteActionLog.objects.all().order_by("created_at"))
+
+    ai_latency_series = [
+        {
+            "label": log.created_at.strftime("%Y-%m-%d %H:%M"),
+            "latency_ms": log.latency_ms,
+        }
+        for log in ai_logs
+    ]
+
+    model_latency_map = defaultdict(lambda: {"latencies": [], "count": 0})
+    for log in ai_logs:
+        model_key = log.model_name or log.mode or "Unknown"
+        model_latency_map[model_key]["latencies"].append(log.latency_ms)
+        model_latency_map[model_key]["count"] += 1
+
+    model_latency_data = [
+        {
+            "label": model_name,
+            "avg_latency_ms": round(sum(values["latencies"]) / len(values["latencies"]), 2),
+            "request_count": values["count"],
+        }
+        for model_name, values in sorted(model_latency_map.items())
+        if values["latencies"]
+    ]
+
+    query_counts = Counter()
+    query_examples = {}
+    for log in ai_logs:
+        normalized = log.normalized_request or normalize_analytics_text(log.request_text)
+        if not normalized:
+            continue
+        query_counts[normalized] += 1
+        query_examples.setdefault(normalized, log.request_text)
+
+    common_queries_data = [
+        {"label": query_examples[key], "count": count}
+        for key, count in query_counts.most_common(10)
+    ]
+
+    ai_usage_daily = build_daily_counts(ai_logs)
+    ai_usage_weekly = build_weekly_counts(ai_logs)
+    favorite_usage_daily = build_daily_counts(favorite_logs)
+    favorite_usage_weekly = build_weekly_counts(favorite_logs)
+
+    favorite_action_breakdown = {
+        "push": sum(1 for log in favorite_logs if log.action == FavoriteActionLog.ACTION_PUSH),
+        "unpush": sum(1 for log in favorite_logs if log.action == FavoriteActionLog.ACTION_UNPUSH),
+    }
+
+    avg_latency = round(sum(log.latency_ms for log in ai_logs) / len(ai_logs), 2) if ai_logs else 0
+    repeat_output_rows = build_repeat_output_rows(ai_logs)
+
+    context = {
+        "total_ai_requests": len(ai_logs),
+        "avg_ai_latency": avg_latency,
+        "unique_query_count": len(query_counts),
+        "total_favorite_actions": len(favorite_logs),
+        "favorite_push_count": favorite_action_breakdown["push"],
+        "favorite_unpush_count": favorite_action_breakdown["unpush"],
+        "ai_latency_series": ai_latency_series,
+        "model_latency_data": model_latency_data,
+        "common_queries_data": common_queries_data,
+        "ai_usage_daily": ai_usage_daily,
+        "ai_usage_weekly": ai_usage_weekly,
+        "favorite_usage_daily": favorite_usage_daily,
+        "favorite_usage_weekly": favorite_usage_weekly,
+        "repeat_output_rows": repeat_output_rows,
+    }
+
+    return render(request, "admin/analytics.html", context)

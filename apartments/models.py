@@ -1,4 +1,5 @@
 # apartments/models.py
+from django.conf import settings
 from django.db import models
 import os
 from datetime import datetime
@@ -59,3 +60,62 @@ class ApartmentImages(models.Model):
     apartment = models.ForeignKey(Apartment, on_delete=models.CASCADE, related_name="images")
     image = models.ImageField(upload_to=timestamped_image_path)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+class AIRequestLog(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ai_request_logs",
+    )
+    mode = models.CharField(max_length=20, blank=True)
+    model_name = models.CharField(max_length=120, blank=True)
+    request_text = models.TextField()
+    normalized_request = models.TextField(blank=True)
+    response_text = models.TextField(blank=True)
+    normalized_response = models.TextField(blank=True)
+    latency_ms = models.PositiveIntegerField(default=0)
+    success = models.BooleanField(default=True)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        status = "success" if self.success else "error"
+        return f"{self.model_name or self.mode or 'ai'} request ({status}) @ {self.created_at:%Y-%m-%d %H:%M}"
+
+
+class FavoriteActionLog(models.Model):
+    ACTION_PUSH = "push"
+    ACTION_UNPUSH = "unpush"
+    ACTION_CHOICES = [
+        (ACTION_PUSH, "Push"),
+        (ACTION_UNPUSH, "Unpush"),
+    ]
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="favorite_action_logs",
+    )
+    apartment = models.ForeignKey(
+        Apartment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="favorite_action_logs",
+    )
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        apartment_name = self.apartment.name if self.apartment else "Unknown apartment"
+        return f"{self.action} favorite for {apartment_name}"
