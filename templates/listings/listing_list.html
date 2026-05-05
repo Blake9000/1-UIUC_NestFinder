@@ -336,8 +336,8 @@
           data-address="{{ listing.address }}"
           data-url="{{ listing.get_absolute_url }}"
           data-image="{{ listing.apartments_images|default:'' }}"
-          data-lat="{{ listing.additional_amenities.latitude|default:'' }}"
-          data-lng="{{ listing.additional_amenities.longitude|default:'' }}"
+          data-lat="{% firstof listing.latitude listing.additional_amenities.latitude '' %}"
+          data-lng="{% firstof listing.longitude listing.additional_amenities.longitude '' %}"
           data-price="{% if listing.prices and listing.prices|length %}{% if listing.prices|length == 1 %}${{ listing.prices.0|floatformat:0 }}/mo{% else %}${{ listing.prices|first|floatformat:0 }}–${{ listing.prices|last|floatformat:0 }}/mo{% endif %}{% elif listing.additional_amenities.price_raw %}{{ listing.additional_amenities.price_raw }}{% else %}{% endif %}"
           data-beds="{{ listing.bedrooms|default:'' }}"
           data-baths="{{ listing.bathrooms|default:'' }}"
@@ -395,7 +395,7 @@
 
     <!-- Map -->
     <div class="map-panel">
-      <div class="map-empty-note" id="map-empty-note">No usable map coordinates were found for the current listings. Check that each listing has latitude/longitude saved in additional_amenities.</div>
+      <div class="map-empty-note" id="map-empty-note">No usable map coordinates were found for the current listings. Check that each listing has latitude/longitude saved.</div>
       <div id="map"></div>
 
       <!-- Detail panel slides in over the map from the right -->
@@ -537,7 +537,7 @@
   } else {
     const emptyNote = document.getElementById('map-empty-note');
     if (emptyNote) {
-      emptyNote.textContent = `No usable map coordinates were found for the current listings. Check that each listing has latitude/longitude saved in additional_amenities. Markers created: ${allMarkers.length}.`;
+      emptyNote.textContent = `No usable map coordinates were found for the current listings. Check that each listing has latitude/longitude saved. Markers created: ${allMarkers.length}.`;
       emptyNote.style.display = 'block';
     }
   }
